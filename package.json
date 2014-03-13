@@ -7,9 +7,10 @@
   },
 
   "devDependencies": {
+    "jslint": "",
     "karma": "~0.10",
     "browserify": "",
-	"watchify": ""
+    "watchify": ""
   },
 
   "dependencies": {
@@ -18,7 +19,8 @@
   },
 
   "scripts": {
-     "test": "./node_modules/.bin/karma start tests/karma.conf.js --single-run --browsers PhantomJS",
-	 "start": "watchify src/knowledge-graph.js -o dist/knowledge-graph.js -v"
+    "test": "karma start tests/karma.conf.js --single-run",
+    "test-watch": "karma start tests/karma.conf.js --auto-watch",
+    "start": "watchify src/knowledge-graph.js -o dist/knowledge-graph.js -v"
   }
 }
