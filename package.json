@@ -1,0 +1,16 @@
+{
+  "name": "knowledge-graph",
+  "version": "0.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/knowledge-graph/knowledge-graph.git"
+  },
+
+  "devDependencies": {
+    "karma": "~0.10"
+  },
+
+  "scripts": {
+     "test": "./node_modules/.bin/karma start tests/karma.conf.js --single-run --browsers PhantomJS"
+  }
+}
