@@ -7,7 +7,13 @@
   },
 
   "devDependencies": {
-    "karma": "~0.10"
+    "karma": "~0.10",
+    "browserify": ""
+  },
+
+  "dependencies": {
+    "d3": "",
+    "dagre-d3": "0.1.5"
   },
 
   "scripts": {
