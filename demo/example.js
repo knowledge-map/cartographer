@@ -26,5 +26,9 @@ g.addEdge(null, "bpitt",     "kbacon",    { label: "Sleepers" });
 g.addEdge(null, "hford",     "lwilson",   { label: "Anchorman 2" });
 g.addEdge(null, "lwilson",   "kbacon",    { label: "Telling Lies in America" });
 
-var renderer = new kg.dagreD3.Renderer();
-renderer.run(g, kg.d3.select("svg g"));
+kg.create({graph: g});
+/*
+var graph = { ... };
+
+knowledgGraph.create({graph: graph});
+*/
