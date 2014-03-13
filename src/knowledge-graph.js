@@ -15,7 +15,9 @@ var createGraph = function(json) {
   var graph = new dagreD3.Digraph();
   // Add all the concepts as nodes
   json.concepts.forEach(function(concept) {
-    graph.addNode(concept.id, concept);
+    graph.addNode(concept.id, {
+     label: concept.name
+    });
   });
   // Check each concept for dependencies and add them as edges
   json.concepts.forEach(function(concept) {
