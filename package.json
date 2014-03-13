@@ -8,7 +8,8 @@
 
   "devDependencies": {
     "karma": "~0.10",
-    "browserify": ""
+    "browserify": "",
+	"watchify": ""
   },
 
   "dependencies": {
@@ -17,6 +18,7 @@
   },
 
   "scripts": {
-     "test": "./node_modules/.bin/karma start tests/karma.conf.js --single-run --browsers PhantomJS"
+     "test": "./node_modules/.bin/karma start tests/karma.conf.js --single-run --browsers PhantomJS",
+	 "start": "watchify src/knowledge-graph.js -o dist/knowledge-graph.js -v"
   }
 }
