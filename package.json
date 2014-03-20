@@ -14,14 +14,14 @@
   },
 
   "dependencies": {
-    "d3": "",
-    "dagre-d3": "0.1.5"
+    "d3": "~3.3.8",
+    "dagre-d3": "git://github.com/knowledge-graph/dagre-d3.git#master"
   },
 
   "scripts": {
     "test": "karma start tests/karma.conf.js --single-run & jshint src/knowledge-graph.js",
     "test-watch": "karma start tests/karma.conf.js --auto-watch",
-    "start": "beefy --live src/knowledge-graph.js"
+    "start": "beefy --live src/knowledge-graph.js:dist/knowledge-graph.js"
   },
 
   "jshintConfig": {
