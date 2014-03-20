@@ -7,10 +7,10 @@
   },
 
   "devDependencies": {
-    "jslint": "",
-    "karma": "~0.10",
+    "jshint": "",
     "browserify": "",
-    "watchify": ""
+    "beefy": "",
+    "karma": "~0.10"
   },
 
   "dependencies": {
@@ -19,8 +19,16 @@
   },
 
   "scripts": {
-    "test": "karma start tests/karma.conf.js --single-run",
+    "test": "karma start tests/karma.conf.js --single-run & jshint src/knowledge-graph.js",
     "test-watch": "karma start tests/karma.conf.js --auto-watch",
-    "start": "watchify src/knowledge-graph.js -o dist/knowledge-graph.js -v"
+    "start": "beefy --live src/knowledge-graph.js"
+  },
+
+  "jshintConfig": {
+    "globals": {
+      "require": false,
+      "global": false,
+      "module": false
+    }
   }
 }
