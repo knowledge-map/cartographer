@@ -21,6 +21,7 @@
   "scripts": {
     "test": "jshint src/knowledge-graph.js & karma start tests/karma.conf.js --single-run",
     "test-watch": "karma start tests/karma.conf.js --auto-watch",
+    "git-setup": "cp -r tools/hooks/* .git/hooks",
     "start": "beefy --live src/knowledge-graph.js:dist/knowledge-graph.js"
   },
 
