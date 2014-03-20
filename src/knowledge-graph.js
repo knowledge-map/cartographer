@@ -16,7 +16,8 @@ var createGraph = function(json) {
   // Add all the concepts as nodes
   json.concepts.forEach(function(concept) {
     graph.addNode(concept.id, {
-     label: concept.name
+     label: concept.name,
+     concept: concept,
     });
   });
   // Check each concept for dependencies and add them as edges
@@ -104,6 +105,7 @@ The available options are:
 */
 var create = function(config) {
   var graph = createGraph(config.graph);
+
   // Create an element on the page for us to render our graph in
   var element = d3.select('body').append('svg');
 
@@ -114,20 +116,51 @@ var create = function(config) {
   renderer.layout().rankSep(100);
   renderer.positionEdgePaths(positionEdgePaths);
 
+  var redraw = function() {
+    renderer.zoomSetup(function(graph, svg) { return svg; });
+    renderer.run(graph, element);
+  };
+
   // Add enter/exit circles
   var drawNodes = renderer.drawNodes();
-  renderer.drawNodes(function(graph, root) {
+  renderer.drawNodes(function(oldGraph, root) {
     var nodes = drawNodes(graph, root);
 
     // Add enter/above
-    nodes.insert('circle', 'rect')
+    var enter = nodes.insert('circle', 'rect')
       .attr('r', 25)
       .attr('cy', function() {
         return -nodes.selectAll('rect').attr('height')/2;
       });
+
+    enter.on('click', function(conceptId) {
+      // Create a new concept
+      var newConcept = {
+        id: "node-"+graph.nodes().length,
+        name: '',
+        dependencies: [],
+      };
+
+      // Add it as a dependency to the concept clicked on
+      var concept = graph.node(conceptId).concept;
+
+      if (concept.dependencies) {
+        concept.dependencies.push(newConcept.id);
+      } else {
+        concept.dependencies = [newConcept.id];
+      }
+
+      // Add it to the graph
+      graph.addNode(newConcept.id, {
+        label: newConcept.name,
+        concept: newConcept,
+      });
+      graph.addEdge(null, newConcept.id, conceptId);
+      redraw();
+    });
     
     // Add exit/below
-    nodes.insert('circle', 'rect')
+    var exit = nodes.insert('circle', 'rect')
       .attr('r', 25)
       .attr('cy', function() {
         return nodes.selectAll('rect').attr('height')/2;
@@ -140,9 +173,11 @@ var create = function(config) {
   renderer.run(graph, element);
 };
 
-var knowledgeGraph = {
-  create: create,
-};
+var knowledgeGraph = new function() {
+  this.create = create;
+
+  return this;
+}();
 
 global.knowledgeGraph = knowledgeGraph; 
 module.exports = knowledgeGraph;
