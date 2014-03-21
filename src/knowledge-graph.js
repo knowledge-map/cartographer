@@ -182,7 +182,7 @@ function addChangeableLabels(graph, nodes) {
         .append('xhtml:input')
           .attr('width', text.getBBox().width)
           .attr('height', text.getBBox().height)
-          .text(conceptId);
+          .attr('value', conceptId);
 
       // Focus element to allow user to immeadiately enter text
       input[0][0].focus();
