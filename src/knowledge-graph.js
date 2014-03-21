@@ -170,6 +170,13 @@ this.create = function(config) {
   renderer.layout().rankSep(100);
   renderer.positionEdgePaths(positionEdgePaths);
 
+  // Add transitions for graph updates
+  renderer.transition(function(selection) {
+    return selection
+      .transition()
+        .duration(500);
+  });
+
   // Add enter/exit circles
   var kg = this;
   var drawNodes = renderer.drawNodes();
