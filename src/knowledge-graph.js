@@ -169,6 +169,8 @@ function addChangeableLabels(graph, nodes) {
 
   nodes.select('text')
     .on('click', function(conceptId) {
+      var concept = kg.graph.node(conceptId);
+
       var text = this;
       var textgroup = d3.select(this.parentNode);
 
@@ -182,7 +184,7 @@ function addChangeableLabels(graph, nodes) {
         .append('xhtml:input')
           .attr('width', text.getBBox().width)
           .attr('height', text.getBBox().height)
-          .attr('value', conceptId);
+          .attr('value', concept.label);
 
       // Focus element to allow user to immeadiately enter text
       input[0][0].focus();
@@ -190,14 +192,11 @@ function addChangeableLabels(graph, nodes) {
       // Change back to text on focus removal
       input.on('blur', function(conceptId) {
         // Replace node label
-        var concept = kg.graph.node(conceptId).concept;
-        concept.name = this.value;
+        concept.label = this.value;
+        concept.concept.name = this.value;
 
         // Add this back into the graph
-        kg.graph.node(concept.id, {
-          label: concept.name,
-          concept: concept,
-        });
+        kg.graph.node(concept.concept.id, concept);
         kg.render();
 
         // Remove
