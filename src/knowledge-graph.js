@@ -136,6 +136,24 @@ function drawEntryExit(graph, nodes) {
       return nodes.selectAll('rect').attr('height')/2;
     });
 
+  // Add concept with a dependency on this concept if exit point is clicked
+  exit.on('click', function(conceptId) {
+    // Get concept clicked on
+    var concept = graph.node(conceptId).concept;
+
+    // Create a new concept
+    var newConcept = {
+      id: "node-"+graph.nodes().length,
+      name: '',
+      dependencies: [concept.id],
+    };
+
+    // Add it to the graph
+    kg.addConcept({
+      concept: newConcept,
+    });
+  });
+
   return nodes;
 }
 
@@ -208,21 +226,24 @@ this.addConcept = function(config) {
   });
 
   // Add dependent edges to the graph
-  config.dependents.forEach(function(dep) {
-    if (dep.dependencies) {
-      dep.dependencies.push(config.concept.id);
-    } else {
-      dep.dependencies = [config.concept.id];
-    }
+  if (config.dependents) {
+    config.dependents.forEach(function(dep) {
+      if (dep.dependencies) {
+        dep.dependencies.push(config.concept.id);
+      } else {
+        dep.dependencies = [config.concept.id];
+      }
 
-    kg.graph.addEdge(null, config.concept.id, dep);
-  });
-  
+      kg.graph.addEdge(null, config.concept.id, dep);
+    });
+  }
 
   // Add dependency edges to the graph
-  config.concept.dependencies.forEach(function(dep) {
-    kg.graph.addEdge(null, dep, config.concept.id);
-  });
+  if (config.concept.dependencies) {
+    config.concept.dependencies.forEach(function(dep) {
+      kg.graph.addEdge(null, dep, config.concept.id);
+    });
+  }
 
   // Update the graph display
   this.render();
