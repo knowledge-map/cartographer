@@ -118,7 +118,7 @@ function drawEntryExit(graph, nodes) {
     // Create a new concept
     var newConcept = {
       id: "node-"+graph.nodes().length,
-      name: '',
+      name: 'New Concept '+graph.nodes().length,
       dependencies: [],
     };
 
@@ -144,7 +144,7 @@ function drawEntryExit(graph, nodes) {
     // Create a new concept
     var newConcept = {
       id: "node-"+graph.nodes().length,
-      name: '',
+      name: 'New Concept '+graph.nodes().length,
       dependencies: [concept.id],
     };
 
@@ -155,6 +155,63 @@ function drawEntryExit(graph, nodes) {
   });
 
   return nodes;
+}
+
+/*
+Takes node elements and adds functionality for
+replacing label with input element when clicked
+
+Used in addition to the default node rendering function
+
+*/
+function addChangeableLabels(graph, nodes) {
+  var kg = this;
+
+  nodes.select('text')
+    .on('click', function(conceptId) {
+      var text = this;
+      var textgroup = d3.select(this.parentNode);
+
+      // Create the input element
+      var obj = textgroup
+        .append('foreignObject')
+          .attr('width', text.getBBox().width)
+          .attr('height', text.getBBox().height);
+
+      var input = obj
+        .append('xhtml:input')
+          .attr('width', text.getBBox().width)
+          .attr('height', text.getBBox().height)
+          .text(conceptId);
+
+      // Focus element to allow user to immeadiately enter text
+      input[0][0].focus();
+
+      // Change back to text on focus removal
+      input.on('blur', function(conceptId) {
+        // Replace node label
+        var concept = kg.graph.node(conceptId).concept;
+        concept.name = this.value;
+
+        // Add this back into the graph
+        kg.graph.node(concept.id, {
+          label: concept.name,
+          concept: concept,
+        });
+        kg.render();
+
+        // Remove
+        obj.remove();
+      });
+
+      // Blur if enter key is pressed
+      input.on('keypress', function() {
+        var ENTER_KEY = 13;
+        if (d3.event.keyCode === ENTER_KEY) {
+          input[0][0].blur();
+        }
+      });
+    });
 }
 
 
@@ -201,6 +258,7 @@ this.create = function(config) {
   renderer.drawNodes(function(graph, element) {
     var nodes = drawNodes(graph, element);
     drawEntryExit.call(kg, graph, nodes);
+    addChangeableLabels.call(kg, graph, nodes);
 
     return nodes;
   });
