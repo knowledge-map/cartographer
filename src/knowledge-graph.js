@@ -271,7 +271,7 @@ Adds a concept to the graph and then updates the graph rendering
 
 config:
   concept: The concept object to add
-  dependents: A list of concepts dependent on this one
+  dependents: A list of concept ids dependent on this one
 */
 this.addConcept = function(config) {
   var kg = this;
@@ -285,22 +285,49 @@ this.addConcept = function(config) {
   // Add dependent edges to the graph
   if (config.dependents) {
     config.dependents.forEach(function(dep) {
-      if (dep.dependencies) {
-        dep.dependencies.push(config.concept.id);
-      } else {
-        dep.dependencies = [config.concept.id];
-      }
-
-      kg.graph.addEdge(null, config.concept.id, dep);
+      kg.addDependency({
+        concept: kg.graph.node(dep).concept,
+        dependency: config.concept.id,
+      });
     });
   }
 
   // Add dependency edges to the graph
   if (config.concept.dependencies) {
     config.concept.dependencies.forEach(function(dep) {
-      kg.graph.addEdge(null, dep, config.concept.id);
+      kg.addDependency({
+        concept: config.concept,
+        dependency: dep,
+      });
     });
   }
+
+  // Update the graph display
+  this.render();
+};
+
+/*
+
+Adds a dependency to the graph and then updates the graph rendering
+
+config:
+  concept: the concept which depends on another concept
+  dependency: the id of the concept which is depended on
+*/
+this.addDependency = function(config) {
+  // Get ids of the concepts
+  var concept = config.concept;
+  var dep = config.dependency;
+
+  // Add the dependency to the list of the concept's dependencies
+  if (concept.dependencies && concept.dependencies.indexOf(dep) === -1) {
+    concept.dependencies.push(dep);
+  } else {
+    concept.dependencies = [dep];
+  }
+
+  // Add the edge to the graph
+  this.graph.addEdge(null, dep, concept.id);
 
   // Update the graph display
   this.render();
