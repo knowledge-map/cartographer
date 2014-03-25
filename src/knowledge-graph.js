@@ -105,54 +105,88 @@ function drawEntryExit(graph, nodes) {
 
   // Add enter/above
   var enter = nodes.insert('circle', 'rect')
+    .classed('enter', true)
     .attr('r', 25)
     .attr('cy', function() {
       return -nodes.selectAll('rect').attr('height')/2;
     });
-
-  // Add dependency to this concept if entry point is clicked
-  enter.on('click', function(conceptId) {
-    // Get concept clicked on
-    var concept = graph.node(conceptId).concept;
-
-    // Create a new concept
-    var newConcept = {
-      id: "node-"+graph.nodes().length,
-      name: 'New Concept '+graph.nodes().length,
-      dependencies: [],
-    };
-
-    // Add it to the graph
-    kg.addConcept({
-      concept: newConcept,
-      dependents: [concept.id],
-    });
-  });
   
   // Add exit/below
   var exit = nodes.insert('circle', 'rect')
+    .classed('exit', true)
     .attr('r', 25)
     .attr('cy', function() {
       return nodes.selectAll('rect').attr('height')/2;
     });
 
-  // Add concept with a dependency on this concept if exit point is clicked
-  exit.on('click', function(conceptId) {
-    // Get concept clicked on
-    var concept = graph.node(conceptId).concept;
+  // Add dragging to join concepts
+  var draggable = nodes.selectAll('circle');
 
-    // Create a new concept
-    var newConcept = {
-      id: "node-"+graph.nodes().length,
-      name: 'New Concept '+graph.nodes().length,
-      dependencies: [concept.id],
-    };
+  var dragPath;
+  var endConcept;
+  var line = d3.svg.line()
+    .interpolate('bundle');
 
-    // Add it to the graph
-    kg.addConcept({
-      concept: newConcept,
+  // Create dragging behaviour
+  var drag = d3.behavior.drag()
+    .on("dragstart", function(d) {
+      // Stop zooming and ignore mouse-entering this concept
+      d3.event.sourceEvent.stopPropagation();
+
+      // Create a path to drag
+      dragPath = d3.select(this.parentNode)
+        .append('path')
+        .classed('edgePath', true)
+        .attr('pointer-events', 'none');
+    })
+    .on("drag", function(d) {
+      // Draw the Path
+      dragPath.attr('d', line([[0,d3.select(this).attr('cy')], [d3.event.x, d3.event.y]]));
+    })
+    .on("dragend", function(d) {
+      // Remove the line
+      dragPath.remove();
+      
+      // Get the concept dragged from
+      var startConcept = kg.graph.node(d).concept;
+
+      // Add the dependency to the graph
+      if (endConcept) {
+        // Get which circle was dragged from
+        var isEnter = d3.select(this).classed('enter');
+        var isExit = d3.select(this).classed('exit');
+
+        // Add a new concept if we didn't drag to another concept
+        if (startConcept.id === endConcept.id) {
+          endConcept = {
+            id: "node-"+kg.graph.nodes().length,
+            name: 'New Concept '+kg.graph.nodes().length,
+          };
+
+          kg.addConcept({concept: endConcept});
+        }
+
+        // Add the dependency according to whether we started dragging
+        // from the enter or exit circle
+        if (isEnter) {
+          kg.addDependency({concept: startConcept, dependency: endConcept.id});
+        } else if (isExit){
+          kg.addDependency({concept: endConcept, dependency: startConcept.id});
+        }
+      }
     });
-  });
+
+  draggable.call(drag);
+
+  // Set the moused-over objects as the concept to join to
+  nodes
+    .attr('pointer-events', 'mouseover')
+    .on('mouseover', function(d) {
+      endConcept = kg.graph.node(d).concept;
+    })
+    .on('mouseout', function(d) {
+      endConcept = null;
+    });
 
   return nodes;
 }
