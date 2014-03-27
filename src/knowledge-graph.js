@@ -279,15 +279,15 @@ this.create = function(config) {
 	}
 
   // Initialise plugins for graph.
-  if(undefined !== config.plugins) {
+  if(config && config.plugins) {
     for(var i = 0; i < config.plugins.length; i++) {
       config.plugins[i].run(this);
     }
+    this.__defineGetter__('plugins', function() {
+      return config.plugins;
+    });
+    this.__defineSetter__('plugins', function() {});
   }
-  this.__defineGetter__('plugins', function() {
-    return config.plugins;
-  });
-  this.__defineSetter__('plugins', function() {});
 
   // Create an element on the page for us to render our graph in
   var element = this.element = d3.select('body').append('svg');
