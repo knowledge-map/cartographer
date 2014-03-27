@@ -45,11 +45,22 @@ The available options are:
 */
 var create = function(config) {
   var graph = createGraph(config.graph);
+  // Initialise plugins for graph.
+  if(undefined !== config.plugins) {
+    for(var i = 0; i < config.plugins.length; i++) {
+      config.plugins[i].run(this);
+    }
+  }
+  this.__defineGetter__('plugins', function() {
+    return config.plugins;
+  });
+  this.__defineSetter__('plugins', function() {});
   // Create an element on the page for us to render our graph in
   var element = d3.select('body').append('svg');
   // Use dagre-d3 to render the graph
   var renderer = new dagreD3.Renderer();
   renderer.run(graph, element);
+  return this;
 };
 
 var knowledgeGraph = {
