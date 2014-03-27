@@ -41,6 +41,7 @@ config: an object that contains the data about the graph and various other
 options
 The available options are:
   graph: a JSON object that contains the graph data
+  plugins: a list of plugin names or plugin objects
 
 */
 var create = function(config) {

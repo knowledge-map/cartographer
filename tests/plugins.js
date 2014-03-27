@@ -17,14 +17,14 @@ describe('Knowledge graph plugin API', function() {
   });
 
   it('calls plugins\' run method', function() {
-    var runSpy = jasmine.createSpy();
+    var runMethod = jasmine.createSpy();
     var graph = knowledgeGraph.create({graph: noGraph, plugins: [
       {
         name: 'plugin',
-        run: runSpy
+        run: runMethod
       }
     ]});
 
-    expect(runSpy).toHaveBeenCalledWith(graph);
+    expect(runMethod).toHaveBeenCalledWith(graph);
   });
 });
