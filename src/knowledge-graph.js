@@ -299,6 +299,10 @@ this.create = function(config) {
   var drawNodes = renderer.drawNodes();
   renderer.drawNodes(function(graph, element) {
     var nodes = drawNodes(graph, element);
+
+		// Add class labels
+		nodes.attr('id', function(d) { return d; });
+
     drawEntryExit.call(kg, graph, nodes);
     addChangeableLabels.call(kg, graph, nodes);
 
