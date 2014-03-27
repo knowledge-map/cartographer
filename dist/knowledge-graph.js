@@ -13889,26 +13889,26 @@ json: TODO describe what the json should look like
 var createGraph = function(json) {
   var graph = new dagreD3.Digraph();
 
-	if (json && json.concepts) {
-		// Add all the concepts as nodes
-		json.concepts.forEach(function(concept) {
-			graph.addNode(concept.id, {
-			 label: concept.name,
-			 concept: concept,
-			});
-		});
-		// Check each concept for dependencies and add them as edges
-		json.concepts.forEach(function(concept) {
-			if (Array.isArray(concept.dependencies)) {
-				concept.dependencies.forEach(function(dep) {
-					// Add an edge from the dependency to the concept with a null edge ID
-					graph.addEdge(null, dep, concept.id);
-				});
-			} else {
-				// Dependencies is undefine/not an array and we'll figure out what to do with it later
-			}
-		});
-	}
+  if (json && json.concepts) {
+    // Add all the concepts as nodes
+    json.concepts.forEach(function(concept) {
+      graph.addNode(concept.id, {
+       label: concept.name,
+       concept: concept,
+      });
+    });
+    // Check each concept for dependencies and add them as edges
+    json.concepts.forEach(function(concept) {
+      if (Array.isArray(concept.dependencies)) {
+        concept.dependencies.forEach(function(dep) {
+          // Add an edge from the dependency to the concept with a null edge ID
+          graph.addEdge(null, dep, concept.id);
+        });
+      } else {
+        // Dependencies is undefine/not an array and we'll figure out what to do with it later
+      }
+    });
+  }
 
   return graph;
 };
@@ -14126,42 +14126,25 @@ function addChangeableLabels(graph, nodes) {
     });
 }
 
-
 /*
 
-The knowledgeGraph object is the public API for the knowledge-graph library
+Construct a knowledge graph object.
+
+Accepts a single object:
+  config: an object that contains the data about the graph and various other
+  options
+  The available options are:
+    graph: a JSON object that contains the graph data
+    plugins: a list of plugin names or plugin objects
 
 */
-var knowledgeGraph = new function() {
-/*
-
-Create a knowledge graph display that layouts out the entire graph.
-
-config: an object that contains the data about the graph and various other
-options
-The available options are:
-  graph: a JSON object that contains the graph data
-  plugins: a list of plugin names or plugin objects
-
-*/
-this.create = function(config) {
+var KnowledgeGraph = function(config) {
   // Create the directed graph
-	var graph;
-	if (config && config.graph) {
+  var graph;
+  if (config && config.graph) {
     graph = this.graph = createGraph(config.graph);
-	} else {
-		graph = this.graph = createGraph(); 
-	}
-
-  // Initialise plugins for graph.
-  if(config && config.plugins) {
-    for(var i = 0; i < config.plugins.length; i++) {
-      config.plugins[i].run(this);
-    }
-    this.__defineGetter__('plugins', function() {
-      return config.plugins;
-    });
-    this.__defineSetter__('plugins', function() {});
+  } else {
+    graph = this.graph = createGraph(); 
   }
 
   // Create an element on the page for us to render our graph in
@@ -14187,8 +14170,8 @@ this.create = function(config) {
   renderer.drawNodes(function(graph, element) {
     var nodes = drawNodes(graph, element);
 
-		// Add class labels
-		nodes.attr('id', function(d) { return d; });
+    // Add class labels
+    nodes.attr('id', function(d) { return d; });
 
     drawEntryExit.call(kg, graph, nodes);
     addChangeableLabels.call(kg, graph, nodes);
@@ -14196,102 +14179,124 @@ this.create = function(config) {
     return nodes;
   });
 
+  /*
+  Adds a concept to the graph and then updates the graph rendering
+
+  config:
+    concept: The concept object to add
+    dependents: A list of concept ids dependent on this one
+  */
+  this.addConcept = function(config) {
+    var kg = this;
+
+    // Add node to the graph
+    this.graph.addNode(config.concept.id, {
+      label: config.concept.name,
+      concept: config.concept,
+    });
+
+    // Add dependent edges to the graph
+    if (config.dependents) {
+      config.dependents.forEach(function(dep) {
+        kg.addDependency({
+          concept: kg.graph.node(dep).concept,
+          dependency: config.concept.id,
+        });
+      });
+    }
+
+    // Add dependency edges to the graph
+    if (config.concept.dependencies) {
+      config.concept.dependencies.forEach(function(dep) {
+        kg.addDependency({
+          concept: config.concept,
+          dependency: dep,
+        });
+      });
+    }
+
+    // Update the graph display
+    this.render();
+  };
+
+  /*
+
+  Adds a dependency to the graph and then updates the graph rendering
+
+  config:
+    concept: the concept which depends on another concept
+    dependency: the id of the concept which is depended on
+  */
+  this.addDependency = function(config) {
+    // Get ids of the concepts
+    var concept = config.concept;
+    var dep = config.dependency;
+
+    // Add the dependency to the list of the concept's dependencies
+    if (concept.dependencies && concept.dependencies.indexOf(dep) === -1) {
+      concept.dependencies.push(dep);
+    } else {
+      concept.dependencies = [dep];
+    }
+
+    // Add the edge to the graph
+    this.graph.addEdge(null, dep, concept.id);
+
+    // Update the graph display
+    this.render();
+  };
+
+  /*
+
+  Renders/rerenders the graph elements
+
+  */
+  this.render = function() {
+    // Run the renderer
+    this.renderer.run(this.graph, this.element);
+    
+    // Don't add another element for the zoom
+    this.renderer.zoomSetup(function(graph, element) {
+      this.element = element;
+      return element;
+    });
+  };
+
+  // Initialise plugins for graph.
+  if(config && config.plugins) {
+    for(var i = 0; i < config.plugins.length; i++) {
+      config.plugins[i].run(this);
+    }
+    this.__defineGetter__('plugins', function() {
+      return config.plugins;
+    });
+    this.__defineSetter__('plugins', function() {});
+  }
+
   // Display the graph
   this.render();
 
-	// Return the knowledge graph object
-	return this;
-};
-
-/*
-Adds a concept to the graph and then updates the graph rendering
-
-config:
-  concept: The concept object to add
-  dependents: A list of concept ids dependent on this one
-*/
-this.addConcept = function(config) {
-  var kg = this;
-
-  // Add node to the graph
-  this.graph.addNode(config.concept.id, {
-    label: config.concept.name,
-    concept: config.concept,
-  });
-
-  // Add dependent edges to the graph
-  if (config.dependents) {
-    config.dependents.forEach(function(dep) {
-      kg.addDependency({
-        concept: kg.graph.node(dep).concept,
-        dependency: config.concept.id,
-      });
-    });
-  }
-
-  // Add dependency edges to the graph
-  if (config.concept.dependencies) {
-    config.concept.dependencies.forEach(function(dep) {
-      kg.addDependency({
-        concept: config.concept,
-        dependency: dep,
-      });
-    });
-  }
-
-  // Update the graph display
-  this.render();
-};
-
-/*
-
-Adds a dependency to the graph and then updates the graph rendering
-
-config:
-  concept: the concept which depends on another concept
-  dependency: the id of the concept which is depended on
-*/
-this.addDependency = function(config) {
-  // Get ids of the concepts
-  var concept = config.concept;
-  var dep = config.dependency;
-
-  // Add the dependency to the list of the concept's dependencies
-  if (concept.dependencies && concept.dependencies.indexOf(dep) === -1) {
-    concept.dependencies.push(dep);
-  } else {
-    concept.dependencies = [dep];
-  }
-
-  // Add the edge to the graph
-  this.graph.addEdge(null, dep, concept.id);
-
-  // Update the graph display
-  this.render();
-};
-
-
-/*
-
-Renders/rerenders the graph elements
-
-*/
-this.render = function() {
-  // Run the renderer
-  this.renderer.run(this.graph, this.element);
-  
-  // Don't add another element for the zoom
-  this.renderer.zoomSetup(function(graph, element) {
-    this.element = element;
-    return element;
-  });
-};
-  
   return this;
-}();
+};
 
-global.knowledgeGraph = knowledgeGraph; 
-module.exports = knowledgeGraph;
+/*
+
+Public API for the knowledge-graph library
+
+*/
+var api = {
+  /*
+
+  Create a knowledge graph display that layouts out the entire graph.
+
+  */
+  create: function(config) {
+    return new KnowledgeGraph(config);
+  }
+};
+
+global.knowledgeGraph = api; 
+module.exports = api;
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{"d3":2,"dagre-d3":3}]},{},[51])
