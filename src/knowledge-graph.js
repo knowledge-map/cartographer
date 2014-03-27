@@ -266,6 +266,7 @@ config: an object that contains the data about the graph and various other
 options
 The available options are:
   graph: a JSON object that contains the graph data
+  plugins: a list of plugin names or plugin objects
 
 */
 this.create = function(config) {
@@ -276,6 +277,17 @@ this.create = function(config) {
 	} else {
 		graph = this.graph = createGraph(); 
 	}
+
+  // Initialise plugins for graph.
+  if(undefined !== config.plugins) {
+    for(var i = 0; i < config.plugins.length; i++) {
+      config.plugins[i].run(this);
+    }
+  }
+  this.__defineGetter__('plugins', function() {
+    return config.plugins;
+  });
+  this.__defineSetter__('plugins', function() {});
 
   // Create an element on the page for us to render our graph in
   var element = this.element = d3.select('body').append('svg');
