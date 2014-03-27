@@ -13,24 +13,28 @@ json: TODO describe what the json should look like
 */
 var createGraph = function(json) {
   var graph = new dagreD3.Digraph();
-  // Add all the concepts as nodes
-  json.concepts.forEach(function(concept) {
-    graph.addNode(concept.id, {
-     label: concept.name,
-     concept: concept,
-    });
-  });
-  // Check each concept for dependencies and add them as edges
-  json.concepts.forEach(function(concept) {
-    if (Array.isArray(concept.dependencies)) {
-      concept.dependencies.forEach(function(dep) {
-        // Add an edge from the dependency to the concept with a null edge ID
-        graph.addEdge(null, dep, concept.id);
-      });
-    } else {
-      // Dependencies is undefine/not an array and we'll figure out what to do with it later
-    }
-  });
+
+	if (json && json.concepts) {
+		// Add all the concepts as nodes
+		json.concepts.forEach(function(concept) {
+			graph.addNode(concept.id, {
+			 label: concept.name,
+			 concept: concept,
+			});
+		});
+		// Check each concept for dependencies and add them as edges
+		json.concepts.forEach(function(concept) {
+			if (Array.isArray(concept.dependencies)) {
+				concept.dependencies.forEach(function(dep) {
+					// Add an edge from the dependency to the concept with a null edge ID
+					graph.addEdge(null, dep, concept.id);
+				});
+			} else {
+				// Dependencies is undefine/not an array and we'll figure out what to do with it later
+			}
+		});
+	}
+
   return graph;
 };
 
@@ -266,7 +270,12 @@ The available options are:
 */
 this.create = function(config) {
   // Create the directed graph
-  var graph = this.graph = createGraph(config.graph);
+	var graph;
+	if (config && config.graph) {
+    graph = this.graph = createGraph(config.graph);
+	} else {
+		graph = this.graph = createGraph(); 
+	}
 
   // Create an element on the page for us to render our graph in
   var element = this.element = d3.select('body').append('svg');
@@ -298,6 +307,9 @@ this.create = function(config) {
 
   // Display the graph
   this.render();
+
+	// Return the knowledge graph object
+	return this;
 };
 
 /*
