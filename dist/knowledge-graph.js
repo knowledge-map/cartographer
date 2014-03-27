@@ -13872,6 +13872,159 @@ exports.values = function(o) {
 module.exports = '0.7.4';
 
 },{}],51:[function(require,module,exports){
+var d3 = require('d3');
+
+/*
+Takes node elements and adds functionality for
+replacing label with input element when clicked
+
+Used in addition to the default node rendering function
+
+*/
+function addChangeableLabels(graph, nodes) {
+  var kg = this;
+
+  nodes.select('text')
+    .on('click', function(conceptId) {
+      var concept = kg.graph.node(conceptId);
+
+      var text = this;
+      var textgroup = d3.select(this.parentNode);
+
+      // Create the input element
+      var obj = textgroup
+        .append('foreignObject')
+          .attr('width', text.getBBox().width)
+          .attr('height', text.getBBox().height);
+
+      var input = obj
+        .append('xhtml:input')
+          .attr('width', text.getBBox().width)
+          .attr('height', text.getBBox().height)
+          .attr('value', concept.label);
+
+      // Focus element to allow user to immeadiately enter text
+      input[0][0].focus();
+
+      // Change back to text on focus removal
+      input.on('blur', function(conceptId) {
+        // Replace node label
+        concept.label = this.value;
+        concept.concept.name = this.value;
+
+        // Add this back into the graph
+        kg.graph.node(concept.concept.id, concept);
+        kg.render();
+
+        // Remove
+        obj.remove();
+      });
+
+      // Blur if enter key is pressed
+      input.on('keypress', function() {
+        var ENTER_KEY = 13;
+        if (d3.event.keyCode === ENTER_KEY) {
+          input[0][0].blur();
+        }
+      });
+    });
+}
+
+/*
+
+Adds interactivity to hamburger buns. Clicking either bun creates a new node
+and a dependency in the correct order. Dragging from a bun to another node
+creates a dependency between the two.
+
+*/
+function addConnectionEditing(graph, nodes) {
+  var kg = this;
+
+  // Add dragging to join concepts
+  var draggable = nodes.selectAll('circle');
+
+  var dragPath;
+  var endConcept;
+  var line = d3.svg.line()
+    .interpolate('bundle');
+
+  // Create dragging behaviour
+  var drag = d3.behavior.drag()
+    .on("dragstart", function(d) {
+      // Stop zooming and ignore mouse-entering this concept
+      d3.event.sourceEvent.stopPropagation();
+
+      // Create a path to drag
+      dragPath = d3.select(this.parentNode)
+        .append('path')
+        .classed('edgePath', true)
+        .attr('pointer-events', 'none');
+    })
+    .on("drag", function(d) {
+      // Draw the Path
+      dragPath.attr('d', line([[0,d3.select(this).attr('cy')], [d3.event.x, d3.event.y]]));
+    })
+    .on("dragend", function(d) {
+      // Remove the line
+      dragPath.remove();
+      
+      // Get the concept dragged from
+      var startConcept = kg.graph.node(d).concept;
+
+      // Add the dependency to the graph
+      if (endConcept) {
+        // Get which circle was dragged from
+        var isEnter = d3.select(this).classed('enter');
+        var isExit = d3.select(this).classed('exit');
+
+        // Add a new concept if we didn't drag to another concept
+        if (startConcept.id === endConcept.id) {
+          endConcept = {
+            id: "node-"+kg.graph.nodes().length,
+            name: 'New Concept '+kg.graph.nodes().length,
+          };
+
+          kg.addConcept({concept: endConcept});
+        }
+
+        // Add the dependency according to whether we started dragging
+        // from the enter or exit circle
+        if (isEnter) {
+          kg.addDependency({concept: startConcept, dependency: endConcept.id});
+        } else if (isExit){
+          kg.addDependency({concept: endConcept, dependency: startConcept.id});
+        }
+      }
+    });
+
+  draggable.call(drag);
+
+  // Set the moused-over objects as the concept to join to
+  nodes
+    .attr('pointer-events', 'mouseover')
+    .on('mouseover', function(d) {
+      endConcept = kg.graph.node(d).concept;
+    })
+    .on('mouseout', function(d) {
+      endConcept = null;
+    });
+
+  return nodes;
+}
+
+function setupEditing(kg) {
+  kg.onEvent('renderGraph', function(e) {
+    addConnectionEditing.call(kg, e.graph, e.nodes);
+    addChangeableLabels.call(kg, e.graph, e.nodes);
+  });
+};
+
+module.exports = {
+  name: 'editing',
+  run: setupEditing
+};
+
+},{"d3":2}],52:[function(require,module,exports){
 (function (global){
 "use strict";
 
@@ -13979,7 +14132,7 @@ Adds entry and exit points for edges into concept elements
 Used in addition to the default node rendering function
 
 */
-function drawEntryExit(graph, nodes) {
+function drawHamburgers(graph, nodes) {
   var kg = this;
 
   // Add enter/above
@@ -13997,134 +14150,7 @@ function drawEntryExit(graph, nodes) {
     .attr('cy', function() {
       return nodes.selectAll('rect').attr('height')/2;
     });
-
-  // Add dragging to join concepts
-  var draggable = nodes.selectAll('circle');
-
-  var dragPath;
-  var endConcept;
-  var line = d3.svg.line()
-    .interpolate('bundle');
-
-  // Create dragging behaviour
-  var drag = d3.behavior.drag()
-    .on("dragstart", function(d) {
-      // Stop zooming and ignore mouse-entering this concept
-      d3.event.sourceEvent.stopPropagation();
-
-      // Create a path to drag
-      dragPath = d3.select(this.parentNode)
-        .append('path')
-        .classed('edgePath', true)
-        .attr('pointer-events', 'none');
-    })
-    .on("drag", function(d) {
-      // Draw the Path
-      dragPath.attr('d', line([[0,d3.select(this).attr('cy')], [d3.event.x, d3.event.y]]));
-    })
-    .on("dragend", function(d) {
-      // Remove the line
-      dragPath.remove();
-      
-      // Get the concept dragged from
-      var startConcept = kg.graph.node(d).concept;
-
-      // Add the dependency to the graph
-      if (endConcept) {
-        // Get which circle was dragged from
-        var isEnter = d3.select(this).classed('enter');
-        var isExit = d3.select(this).classed('exit');
-
-        // Add a new concept if we didn't drag to another concept
-        if (startConcept.id === endConcept.id) {
-          endConcept = {
-            id: "node-"+kg.graph.nodes().length,
-            name: 'New Concept '+kg.graph.nodes().length,
-          };
-
-          kg.addConcept({concept: endConcept});
-        }
-
-        // Add the dependency according to whether we started dragging
-        // from the enter or exit circle
-        if (isEnter) {
-          kg.addDependency({concept: startConcept, dependency: endConcept.id});
-        } else if (isExit){
-          kg.addDependency({concept: endConcept, dependency: startConcept.id});
-        }
-      }
-    });
-
-  draggable.call(drag);
-
-  // Set the moused-over objects as the concept to join to
-  nodes
-    .attr('pointer-events', 'mouseover')
-    .on('mouseover', function(d) {
-      endConcept = kg.graph.node(d).concept;
-    })
-    .on('mouseout', function(d) {
-      endConcept = null;
-    });
-
-  return nodes;
-}
-
-/*
-Takes node elements and adds functionality for
-replacing label with input element when clicked
-
-Used in addition to the default node rendering function
-
-*/
-function addChangeableLabels(graph, nodes) {
-  var kg = this;
-
-  nodes.select('text')
-    .on('click', function(conceptId) {
-      var concept = kg.graph.node(conceptId);
-
-      var text = this;
-      var textgroup = d3.select(this.parentNode);
-
-      // Create the input element
-      var obj = textgroup
-        .append('foreignObject')
-          .attr('width', text.getBBox().width)
-          .attr('height', text.getBBox().height);
-
-      var input = obj
-        .append('xhtml:input')
-          .attr('width', text.getBBox().width)
-          .attr('height', text.getBBox().height)
-          .attr('value', concept.label);
-
-      // Focus element to allow user to immeadiately enter text
-      input[0][0].focus();
-
-      // Change back to text on focus removal
-      input.on('blur', function(conceptId) {
-        // Replace node label
-        concept.label = this.value;
-        concept.concept.name = this.value;
-
-        // Add this back into the graph
-        kg.graph.node(concept.concept.id, concept);
-        kg.render();
-
-        // Remove
-        obj.remove();
-      });
-
-      // Blur if enter key is pressed
-      input.on('keypress', function() {
-        var ENTER_KEY = 13;
-        if (d3.event.keyCode === ENTER_KEY) {
-          input[0][0].blur();
-        }
-      });
-    });
-}
+};
 
 /*
 
@@ -14173,11 +14199,39 @@ var KnowledgeGraph = function(config) {
     // Add class labels
     nodes.attr('id', function(d) { return d; });
 
-    drawEntryExit.call(kg, graph, nodes);
-    addChangeableLabels.call(kg, graph, nodes);
+    // Add burger buns
+    drawHamburgers.call(kg, graph, nodes);
+
+    // Add interactivity
+    kg.postEvent({
+      type: 'renderGraph',
+      graph: graph,
+      nodes: nodes
+    });
 
     return nodes;
   });
+
+  /*
+  Message API
+  */
+  this.dispatcher = {};
+
+  this.postEvent = function(e) {
+    if(this.dispatcher[e.type]) {
+      var callbacks = this.dispatcher[e.type];
+      callbacks.forEach(function(callback) {
+        callback(e);
+      });
+    }
+  };
+
+  this.onEvent = function(type, callback) {
+    if(undefined === this.dispatcher[type]) {
+      this.dispatcher[type] = [];
+    }
+    this.dispatcher[type].push(callback);
+  };
 
   /*
   Adds a concept to the graph and then updates the graph rendering
@@ -14292,6 +14346,10 @@ var api = {
   */
   create: function(config) {
     return new KnowledgeGraph(config);
+  },
+
+  plugins: {
+    'editing': require('./editing-plugin.js')
   }
 };
 
@@ -14299,4 +14357,4 @@ global.knowledgeGraph = api;
 module.exports = api;
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"d3":2,"dagre-d3":3}]},{},[51])
+},{"./editing-plugin.js":51,"d3":2,"dagre-d3":3}]},{},[52])
