@@ -4,36 +4,54 @@
 var knowledge = {
   concepts: [
     {
-      id: "1digitadd",
-      name: "1-digit addition",
+      id: "knowledge-map",
+      name: "What is a knowledge map?",
+      content: {
+        description: "Knowledge maps are like a roadmap for pieces of knowledge. They can be used to show others how to navigate from their current set of knowledge to a particular goal. Or they can be used to find people who know something you haven't learnt yet.",
+        link: ""
+      }
     },
     {
-      id: "1digitsub",
-      name: "1-digit subtraction",
-      dependencies: ["1digitadd"]
+      id: "viewing",
+      name: "Viewing a knowledge map",
+      dependencies: ["knowledge-map"],
+      content: {
+        description: "You're doing it right now! Each of the labelled points on the page is called a 'concept' and the arrows joining them are called 'dependencies'. Concepts are pieces of information that can be learned if you have learned all of the concepts which point to it. That is, if you want to learn a concept learn all of its dependencies!",
+        link: ""
+      }
     },
     {
-      id: "23digitsub",
-      name: "2- and 3-digit",
-      dependencies: ["1digitsub"]
+      id: "creating",
+      name: "Create your own knowledge map",
+      dependencies: ["knowledge-map", "viewing"],
+      content: {
+        description: "If you want to share how to do or learn something then create your own map! This concept links to an interactive demonstration that will allow you to create your own knowledge map.",
+        link: "/demo/edit.html"
+      }
     },
     {
-      id: "addsubword",
-      name: "Addition and subtraction word problems",
-      dependencies: ["23digitsub", "2digitadd"]
+      id: "sharing",
+      name: "Sharing your own knowledge map",
+      dependencies: ["creating"],
+      content: {
+        description: "Once you've created your own knowledge map you can share it in various ways. You can embed the knowledge map in your website or save it as an image.",
+        link: ""
+      }
     },
     {
-      id: "2digitadd",
-      name: "2-digit addition",
-      dependencies: ["1digitadd"]
-    },
-    {
-      id: "numline1",
-      name: "Number line 1",
-      dependencies: ["1digitadd"]
+      id: "learning",
+      name: "Learning using knowledge maps",
+      dependencies: ["viewing"],
+      content: {
+        description: "You can learn by using the resources attached to a concept or by contacting people who know the concept. The best knowledge maps will give you lots of different resources to try and learn each concept.",
+        link: ""
+      }
     }
   ]
 };
 
 // Create graph that visualises the knowledge
-knowledgeGraph.create({graph: knowledge});
+knowledgeGraph.create({
+  graph: knowledge,
+  plugins: [knowledgeGraph.plugins.links],
+});
