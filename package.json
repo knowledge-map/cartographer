@@ -21,7 +21,7 @@
 
   "scripts": {
     "git-setup": "cp -r tools/hooks/* .git/hooks",
-	"build": "tools/build",
+	"build": "node tools/build.js",
     "watch": "watchify src/knowledge-graph.js -d -o dist/knowledge-graph.js",
     "start": "npm run watch & beefy --live src/knowledge-graph.js",
     "test": "jshint src/knowledge-graph.js & karma start tests/karma.conf.js --single-run",
