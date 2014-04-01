@@ -27,4 +27,18 @@ describe('Knowledge graph plugin API', function() {
 
     expect(runMethod).toHaveBeenCalledWith(graph);
   });
+
+  it('finds plugins defined by name', function() {
+    var plugin = {
+      name: 'barry',
+      run: jasmine.createSpy()
+    };
+    knowledgeGraph.registerPlugin(plugin);
+    var graph = knowledgeGraph.create({
+      graph: noGraph,
+      plugins: [plugin.name]
+    });
+
+    expect(plugin.run).toHaveBeenCalled();
+  });
 });
