@@ -14025,7 +14025,8 @@ module.exports = {
 };
 
 },{"d3":2}],52:[function(require,module,exports){
-(function (global){"use strict";
+(function (global){
+"use strict";
 
 var dagreD3 = require('dagre-d3');
 var d3 = require('d3');
@@ -14149,7 +14150,7 @@ function drawHamburgers(graph, nodes) {
     .attr('cy', function() {
       return nodes.selectAll('rect').attr('height')/2;
     });
-};
+}
 
 /*
 
@@ -14163,7 +14164,7 @@ Accepts a single object:
     plugins: a list of plugin names or plugin objects
 
 */
-var KnowledgeGraph = function(config) {
+var KnowledgeGraph = function(api, config) {
   // Create the directed graph
   var graph;
   if (config && config.graph) {
@@ -14318,7 +14319,13 @@ var KnowledgeGraph = function(config) {
   // Initialise plugins for graph.
   if(config && config.plugins) {
     for(var i = 0; i < config.plugins.length; i++) {
-      config.plugins[i].run(this);
+      var plugin = config.plugins[i];
+      if('string' === typeof(plugin)) {
+        plugin = api.plugins[plugin];
+      }
+      if(plugin && plugin.run) {
+        plugin.run(this);
+      }
     }
     this.__defineGetter__('plugins', function() {
       return config.plugins;
@@ -14344,17 +14351,24 @@ var api = {
 
   */
   create: function(config) {
-    return new KnowledgeGraph(config);
+    return new KnowledgeGraph(this, config);
   },
 
   plugins: {
     'links': require('./links-plugin.js'),
     'editing': require('./editing-plugin.js'),
+  },
+
+  registerPlugin: function(plugin) {
+    if(plugin && plugin.name && plugin.run) {
+      this.plugins[plugin.name] = plugin;
+    }
   }
 };
 
 global.knowledgeGraph = api; 
 module.exports = api;
+
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{"./editing-plugin.js":51,"./links-plugin.js":53,"d3":2,"dagre-d3":3}],53:[function(require,module,exports){
 var d3 = require('d3');
@@ -14365,16 +14379,20 @@ function addNodeLinks(graph, nodes) {
     // Get the concept object
     var concept = graph.node(conceptId).concept;
 
-    // Create an anchor tag to insert the node labels into
-    var anchor = document.createElementNS('http://www.w3.org/2000/svg', 'a');
-    this.parentNode.appendChild(anchor);
+    var content = concept.content;
 
-    // Set the link target
-    anchor.setAttributeNS('http://www.w3.org/1999/xlink',
-                          'href', concept.link);
+    if (content && content.link) {
+      // Create an anchor tag to insert the node labels into
+      var anchor = document.createElementNS('http://www.w3.org/2000/svg', 'a');
+      this.parentNode.appendChild(anchor);
 
-    // Insert the labels into the anchor tag
-    anchor.appendChild(this);
+      // Set the link target
+      anchor.setAttributeNS('http://www.w3.org/1999/xlink',
+                            'href', content.link);
+
+      // Insert the labels into the anchor tag
+      anchor.appendChild(this);
+    }
   });
 
   return nodes;
