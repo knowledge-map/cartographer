@@ -1,0 +1,11 @@
+#!/bin/sh
+
+NAME=knowledge-graph
+SOURCE=src/knowledge-graph
+DIST=dist
+
+# Create different sets of builds
+## Default
+browserify ${SOURCE} -o ${DIST}/${NAME}.js
+## No D3
+browserify ${SOURCE} -o ${DIST}/${NAME}-nod3.js --ignore d3
