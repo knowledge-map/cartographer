@@ -122,7 +122,7 @@ function drawHamburgers(graph, nodes) {
     .attr('cy', function() {
       return nodes.selectAll('rect').attr('height')/2;
     });
-};
+}
 
 /*
 
@@ -136,7 +136,7 @@ Accepts a single object:
     plugins: a list of plugin names or plugin objects
 
 */
-var KnowledgeGraph = function(config) {
+var KnowledgeGraph = function(api, config) {
   // Create the directed graph
   var graph;
   if (config && config.graph) {
@@ -291,7 +291,13 @@ var KnowledgeGraph = function(config) {
   // Initialise plugins for graph.
   if(config && config.plugins) {
     for(var i = 0; i < config.plugins.length; i++) {
-      config.plugins[i].run(this);
+      var plugin = config.plugins[i];
+      if('string' === typeof(plugin)) {
+        plugin = api.plugins[plugin];
+      }
+      if(plugin && plugin.run) {
+        plugin.run(this);
+      }
     }
     this.__defineGetter__('plugins', function() {
       return config.plugins;
@@ -317,12 +323,18 @@ var api = {
 
   */
   create: function(config) {
-    return new KnowledgeGraph(config);
+    return new KnowledgeGraph(this, config);
   },
 
   plugins: {
     'links': require('./links-plugin.js'),
     'editing': require('./editing-plugin.js'),
+  },
+
+  registerPlugin: function(plugin) {
+    if(plugin && plugin.name && plugin.run) {
+      this.plugins[plugin.name] = plugin;
+    }
   }
 };
 
