@@ -20,7 +20,7 @@
   },
 
   "scripts": {
-    "git-setup": "cp -r tools/hooks/* .git/hooks",
+    "git-setup": "tools/gitsetup",
 	"build": "node tools/build.js",
     "watch": "watchify src/knowledge-graph.js -d -o dist/knowledge-graph.js",
     "start": "npm run watch & beefy --live src/knowledge-graph.js",
