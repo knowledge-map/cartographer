@@ -14025,8 +14025,7 @@ module.exports = {
 };
 
 },{"d3":2}],52:[function(require,module,exports){
-(function (global){
-"use strict";
+(function (global){"use strict";
 
 var dagreD3 = require('dagre-d3');
 var d3 = require('d3');
@@ -14349,12 +14348,47 @@ var api = {
   },
 
   plugins: {
-    'editing': require('./editing-plugin.js')
+    'links': require('./links-plugin.js'),
+    'editing': require('./editing-plugin.js'),
   }
 };
 
 global.knowledgeGraph = api; 
 module.exports = api;
-
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./editing-plugin.js":51,"d3":2,"dagre-d3":3}]},{},[52])
+},{"./editing-plugin.js":51,"./links-plugin.js":53,"d3":2,"dagre-d3":3}],53:[function(require,module,exports){
+var d3 = require('d3');
+
+function addNodeLinks(graph, nodes) {
+  // Add links for each node
+  nodes.each(function(conceptId) {
+    // Get the concept object
+    var concept = graph.node(conceptId).concept;
+
+    // Create an anchor tag to insert the node labels into
+    var anchor = document.createElementNS('http://www.w3.org/2000/svg', 'a');
+    this.parentNode.appendChild(anchor);
+
+    // Set the link target
+    anchor.setAttributeNS('http://www.w3.org/1999/xlink',
+                          'href', concept.link);
+
+    // Insert the labels into the anchor tag
+    anchor.appendChild(this);
+  });
+
+  return nodes;
+}
+
+function setupLinks(kg) {
+  kg.onEvent('renderGraph', function(e) {
+    addNodeLinks.call(kg, e.graph, e.nodes);
+  });
+};
+
+module.exports = {
+  name: 'links',
+  run: setupLinks,
+};
+
+},{"d3":2}]},{},[52])

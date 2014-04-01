@@ -321,7 +321,8 @@ var api = {
   },
 
   plugins: {
-    'editing': require('./editing-plugin.js')
+    'links': require('./links-plugin.js'),
+    'editing': require('./editing-plugin.js'),
   }
 };
 
