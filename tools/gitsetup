@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Don't automatically track changes on distribution files
+git ls-files dist | xargs git update-index --assume-unchanged
+
+# Setup commit hooks
+cp -r tools/hooks/* .git/hooks
