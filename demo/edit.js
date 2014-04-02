@@ -18,8 +18,13 @@ var knowledge = {
     },
     {
       id: "joining",
-      name: "Drag from one node to another to add dependencies",
+      name: "Drag from one concept to another to add dependencies",
       dependencies: ["edit"]
+    },
+    {
+      id: "removing",
+      name: "Drag between a concept and its dependency to remove the connection",
+      dependencies: ["joining"]
     }
   ]
 };
