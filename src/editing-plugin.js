@@ -113,12 +113,22 @@ function addConnectionEditing(graph, nodes) {
           kg.addConcept({concept: endConcept});
         }
 
-        // Add the dependency according to whether we started dragging
-        // from the enter or exit circle
-        if (isEnter) {
-          kg.addDependency({concept: startConcept, dependency: endConcept.id});
-        } else if (isExit){
-          kg.addDependency({concept: endConcept, dependency: startConcept.id});
+        // Remove the dependency if we are draggin between two concepts
+        // that already have a dependency between them
+        var forward = {concept: startConcept.id, dependency: endConcept.id},
+            backward = {concept: endConcept.id, dependency: startConcept.id};
+        if (kg.hasDependency(forward)) {
+          kg.removeDependency(forward);
+        } else if (kg.hasDependency(backward)) {
+          kg.removeDependency(backward);
+        } else {
+          // Add the dependency according to whether we started dragging
+          // from the enter or exit circle
+          if (isEnter) {
+            kg.addDependency({concept: startConcept, dependency: endConcept.id});
+          } else if (isExit){
+            kg.addDependency({concept: endConcept, dependency: startConcept.id});
+          }
         }
       }
     });

@@ -27,7 +27,7 @@ var createGraph = function(json) {
       if (Array.isArray(concept.dependencies)) {
         concept.dependencies.forEach(function(dep) {
           // Add an edge from the dependency to the concept with a null edge ID
-          graph.addEdge(null, dep, concept.id);
+          graph.addEdge(dep+'-'+concept.id, dep, concept.id);
         });
       } else {
         // Dependencies is undefine/not an array and we'll figure out what to do with it later
@@ -266,10 +266,48 @@ var KnowledgeGraph = function(config) {
     }
 
     // Add the edge to the graph
-    this.graph.addEdge(null, dep, concept.id);
+    this.graph.addEdge(dep+'-'+concept.id, dep, concept.id);
 
     // Update the graph display
     this.render();
+  };
+
+  /*
+
+  Removes a dependency from the graph and then updates the graph rendering
+
+  */
+  this.removeDependency = function(config) {
+    // Get ids of concepts
+    var con = config.concept;
+    var dep = config.dependency;
+
+    // Remove the dependency from the concept
+    var concept = this.graph.node(con).concept;
+    if (concept.dependencies) {
+      var index = concept.dependencies.indexOf(dep);
+      concept.dependencies.splice(index, 1);
+    }
+
+    // Remove the edge from the graph
+    this.graph.delEdge(dep+'-'+con);
+
+    // Update the graph display
+    this.render();
+  };
+
+  /*
+  
+  Returns true if the graph has this dependency and false otherwise
+
+  */
+  this.hasDependency = function(config) {
+    // Get ids of concepts
+    var concept = config.concept;
+    var dep = config.dependency;
+
+    // Return true if edge exists
+    return this.graph.hasEdge(dep+'-'+concept);
   };
 
   /*
