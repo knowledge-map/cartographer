@@ -1,7 +1,15 @@
 describe('Knowledge graph API', function() {
-  it('should exist and have a create function', function() {
+  it('should exist', function() {
     expect(knowledgeGraph).toBeDefined();
+  });
+
+  it('should have a create function', function() {
     expect(knowledgeGraph.create).toBeDefined();
+  });
+
+  it('should have a plugin API', function() {
+    expect(knowledgeGraph.plugins).toBeDefined();
+    expect(knowledgeGraph.registerPlugin).toBeDefined();
   });
 });
 
