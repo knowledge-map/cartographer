@@ -27,7 +27,7 @@ var createGraph = function(json) {
       if (Array.isArray(concept.dependencies)) {
         concept.dependencies.forEach(function(dep) {
           // Add an edge from the dependency to the concept with a null edge ID
-          graph.addEdge(null, dep, concept.id);
+          graph.addEdge(dep+'-'+concept.id, dep, concept.id);
         });
       } else {
         // Dependencies is undefine/not an array and we'll figure out what to do with it later
@@ -122,7 +122,7 @@ function drawHamburgers(graph, nodes) {
     .attr('cy', function() {
       return nodes.selectAll('rect').attr('height')/2;
     });
-};
+}
 
 /*
 
@@ -136,7 +136,7 @@ Accepts a single object:
     plugins: a list of plugin names or plugin objects
 
 */
-var KnowledgeGraph = function(config) {
+var KnowledgeGraph = function(api, config) {
   // Create the directed graph
   var graph;
   if (config && config.graph) {
@@ -266,10 +266,48 @@ var KnowledgeGraph = function(config) {
     }
 
     // Add the edge to the graph
-    this.graph.addEdge(null, dep, concept.id);
+    this.graph.addEdge(dep+'-'+concept.id, dep, concept.id);
 
     // Update the graph display
     this.render();
+  };
+
+  /*
+
+  Removes a dependency from the graph and then updates the graph rendering
+
+  */
+  this.removeDependency = function(config) {
+    // Get ids of concepts
+    var con = config.concept;
+    var dep = config.dependency;
+
+    // Remove the dependency from the concept
+    var concept = this.graph.node(con).concept;
+    if (concept.dependencies) {
+      var index = concept.dependencies.indexOf(dep);
+      concept.dependencies.splice(index, 1);
+    }
+
+    // Remove the edge from the graph
+    this.graph.delEdge(dep+'-'+con);
+
+    // Update the graph display
+    this.render();
+  };
+
+  /*
+  
+  Returns true if the graph has this dependency and false otherwise
+
+  */
+  this.hasDependency = function(config) {
+    // Get ids of concepts
+    var concept = config.concept;
+    var dep = config.dependency;
+
+    // Return true if edge exists
+    return this.graph.hasEdge(dep+'-'+concept);
   };
 
   /*
@@ -291,7 +329,13 @@ var KnowledgeGraph = function(config) {
   // Initialise plugins for graph.
   if(config && config.plugins) {
     for(var i = 0; i < config.plugins.length; i++) {
-      config.plugins[i].run(this);
+      var plugin = config.plugins[i];
+      if('string' === typeof(plugin)) {
+        plugin = api.plugins[plugin];
+      }
+      if(plugin && plugin.run) {
+        plugin.run(this);
+      }
     }
     this.__defineGetter__('plugins', function() {
       return config.plugins;
@@ -317,12 +361,18 @@ var api = {
 
   */
   create: function(config) {
-    return new KnowledgeGraph(config);
+    return new KnowledgeGraph(this, config);
   },
 
   plugins: {
     'links': require('./links-plugin.js'),
     'editing': require('./editing-plugin.js'),
+  },
+
+  registerPlugin: function(plugin) {
+    if(plugin && plugin.name && plugin.run) {
+      this.plugins[plugin.name] = plugin;
+    }
   }
 };
 
