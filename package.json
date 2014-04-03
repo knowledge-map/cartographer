@@ -17,7 +17,7 @@
   "dependencies": {
     "d3": "~3.3.8",
     "dagre-d3": "git://github.com/knowledge-graph/dagre-d3.git#master",
-	 "PicoModal": "git://github.com/Nycto/PicoModal.git#23f5ca702a1dbdf2a8da14133e608228448fcfb5"
+    "PicoModal": "git://github.com/d3x7r0/PicoModal.git#master"
   },
 
   "scripts": {

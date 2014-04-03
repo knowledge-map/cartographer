@@ -367,6 +367,7 @@ var api = {
   plugins: {
     'links': require('./links-plugin.js'),
     'editing': require('./editing-plugin.js'),
+    'modals': require('./modals-plugin.js'),
   },
 
   registerPlugin: function(plugin) {
