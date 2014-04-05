@@ -1,0 +1,28 @@
+@color: #ee5555;
+
+@label-color: white;
+
+@line-color: darken(@color, 50%);
+@line-width: 4px;
+
+.node {
+  circle {
+    fill: @color;
+  }
+
+  rect {
+    fill: @label-color;
+  }
+}
+
+.edgePath {
+  path {
+    fill: none;
+    stroke: @line-color;
+    stroke-width: @line-width;
+  }
+}
+
+#arrowhead {
+  fill: @line-color !important;
+}

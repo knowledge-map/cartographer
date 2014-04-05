@@ -1,0 +1,14 @@
+.node circle {
+  fill: #ee5555;
+}
+.node rect {
+  fill: #ffffff;
+}
+.edgePath path {
+  fill: none;
+  stroke: #3e0606;
+  stroke-width: 4px;
+}
+#arrowhead {
+  fill: #3e0606 !important;
+}
