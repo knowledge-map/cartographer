@@ -47,6 +47,7 @@ describe('Adding a dependency to a knowledge graph', function() {
   };
 
   beforeEach(function() {
+    sampleConcept.dependencies = undefined;
     kg = knowledgeGraph.create();
     kg.addConcept({concept: sampleConcept});
     kg.addConcept({concept: dependencyConcept});
@@ -59,7 +60,7 @@ describe('Adding a dependency to a knowledge graph', function() {
   });
 
   it('should add the edge to the display', function() {
-    var edge = kg.element.select('.'+dependencyConcept.id+'-'+sampleConcept.id).node();
+    var edge = kg.element.select('.edgePath#'+dependencyConcept.id+'-'+sampleConcept.id).node();
     expect(edge).not.toBe(null);
   });
 });

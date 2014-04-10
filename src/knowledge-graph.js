@@ -46,6 +46,10 @@ Offsets the in/out edges to above/below given nodes
 Replaces the default dagre-d3 PositionEdgePaths function
 */
 function positionEdgePaths(g, svgEdgePaths) {
+  // Add an ID to each edge
+  svgEdgePaths
+    .attr('id', function(d) { return d; });
+
   var interpolate = this._edgeInterpolate,
       tension = this._edgeTension;
 
