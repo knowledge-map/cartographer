@@ -1,8 +1,24 @@
+@import "knowledge-graph.less";
+
 @close-size: 30px;
 @close-padding: 5px;
 
 .pico-content {
   font-family: 'Fira', sans-serif;
+
+  a {
+    font-weight: bold;
+    text-decoration: none;
+    color: @highlight-color;
+  }
+
+  a:visited {
+    color: lighten(@highlight-color, 12%);
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
 }
 
 .pico-close {
