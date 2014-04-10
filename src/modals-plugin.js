@@ -50,7 +50,8 @@ function addNodeModalEvents(graph, nodes) {
 
       modal({
         content: html,
-        closeButton: true
+        closeButton: true,
+        width: 700,
       });
     });
 }
