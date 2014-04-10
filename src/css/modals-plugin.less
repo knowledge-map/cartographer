@@ -1,3 +1,17 @@
+@close-size: 30px;
+@close-padding: 5px;
+
 .pico-content {
   font-family: 'Fira', sans-serif;
+}
+
+.pico-close {
+  height: auto !important;
+  width: auto !important;
+  padding: @close-padding;
+
+  font-size: 2*(@close-size - @close-padding*2) !important;
+  line-height: (@close-size - @close-padding*2) !important;
+
+  background-color: transparent !important;
 }
