@@ -31,7 +31,10 @@ function addNodeModalEvents(graph, nodes) {
         // Fuse content into HTML template.
         if(texts.length) {
           html += texts.map(function(content) {
-            return article('<h2>' + content.title + '</h2>', content.text);
+            if(!content.title) {
+              content.title = "";
+            }
+              return article('<h2>' + content.title + '</h2>', content.text);
           }).join('');
         }
         if(links.length) {
