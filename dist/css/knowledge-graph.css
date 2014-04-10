@@ -1,14 +1,21 @@
-.node circle {
-  fill: #ee5555;
+text {
+  font-family: 'Fira', sans-serif;
+  fill: #000000;
+}
+.node .enter {
+  fill: #cccccc;
+}
+.node .exit {
+  fill: #cccccc;
 }
 .node rect {
   fill: #ffffff;
 }
 .edgePath path {
   fill: none;
-  stroke: #3e0606;
-  stroke-width: 4px;
+  stroke: #808080;
+  stroke-width: 2px;
 }
 #arrowhead {
-  fill: #3e0606 !important;
+  fill: #808080 !important;
 }
