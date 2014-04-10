@@ -1,12 +1,22 @@
-@color: #ee5555;
+@color: #ccc;
 
 @label-color: white;
+@label-text-color: #fff - @label-color;
 
-@line-color: darken(@color, 50%);
-@line-width: 4px;
+@line-color: darken(@color, 30%);
+@line-width: 2px;
+
+text {
+  font-family: 'Fira', sans-serif;
+  fill: @label-text-color;
+}
 
 .node {
-  circle {
+  .enter {
+    fill: @color;
+  }
+
+  .exit {
     fill: @color;
   }
 
@@ -22,6 +32,8 @@
     stroke-width: @line-width;
   }
 }
+
+
 
 #arrowhead {
   fill: @line-color !important;
