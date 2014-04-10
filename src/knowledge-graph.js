@@ -161,9 +161,20 @@ var KnowledgeGraph = function(api, config) {
 
   // Add transitions for graph updates
   renderer.transition(function(selection) {
-    return selection
-      .transition()
-        .duration(500);
+    var duration;
+    if (config) {
+      duration = config.transitionDuration;
+    } else {
+      duration = 500;
+    }
+
+    if (duration) {
+      return selection
+        .transition()
+          .duration(duration);
+    } else {
+      return selection;
+    }
   });
 
   // Add enter/exit circles

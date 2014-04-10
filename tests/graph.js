@@ -81,7 +81,9 @@ describe('Removing a dependency from a knowledge graph', function() {
   };
 
   beforeEach(function() {
-    kg = knowledgeGraph.create();
+    kg = knowledgeGraph.create({
+	  transitionDuration: null,
+	});
     kg.addConcept({concept: sampleConcept});
     kg.addConcept({concept: dependencyConcept});
     kg.addDependency({concept: sampleConcept, dependency: dependencyConcept.id});
@@ -94,7 +96,7 @@ describe('Removing a dependency from a knowledge graph', function() {
   });
 
   it('should remove the edge from the display', function() {
-    var edge = kg.element.select('.'+dependencyConcept.id+'-'+sampleConcept.id).node();
+    var edge = kg.element.select('.edgePath#'+dependencyConcept.id+'-'+sampleConcept.id).node();
     expect(edge).toBe(null);
   });
 
