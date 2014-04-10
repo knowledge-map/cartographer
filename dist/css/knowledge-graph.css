@@ -19,3 +19,6 @@ text {
 #arrowhead {
   fill: #808080 !important;
 }
+.pico-content {
+  font-family: 'Fira', sans-serif;
+}
