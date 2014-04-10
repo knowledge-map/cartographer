@@ -1,0 +1,24 @@
+text {
+  font-family: 'Fira', sans-serif;
+  fill: #000000;
+}
+.node .enter {
+  fill: #cccccc;
+}
+.node .exit {
+  fill: #cccccc;
+}
+.node rect {
+  fill: #ffffff;
+}
+.edgePath path {
+  fill: none;
+  stroke: #808080;
+  stroke-width: 2px;
+}
+#arrowhead {
+  fill: #808080 !important;
+}
+.pico-content {
+  font-family: 'Fira', sans-serif;
+}

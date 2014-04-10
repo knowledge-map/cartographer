@@ -1,0 +1,42 @@
+@color: #ccc;
+
+@highlight-color: salmon;
+
+@label-color: white;
+@label-text-color: #fff - @label-color;
+
+@line-color: darken(@color, 30%);
+@line-width: 2px;
+
+text {
+  font-family: 'Fira', sans-serif;
+  fill: @label-text-color;
+}
+
+.node {
+  .enter {
+    fill: @color;
+  }
+
+  .exit {
+    fill: @color;
+  }
+
+  rect {
+    fill: @label-color;
+  }
+}
+
+.edgePath {
+  path {
+    fill: none;
+    stroke: @line-color;
+    stroke-width: @line-width;
+  }
+}
+
+
+
+#arrowhead {
+  fill: @line-color !important;
+}

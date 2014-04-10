@@ -1,0 +1,47 @@
+@import "knowledge-graph.less";
+
+@heading-size: 40px;
+
+@close-size: 30px;
+@close-padding: 5px;
+
+@content-text-color: #444;
+
+.pico-content {
+  font-family: 'Fira', sans-serif;
+
+  > h1 {
+    font-size: @heading-size;
+    line-height: @heading-size * 1.3;
+    margin-bottom: @heading-size * 1;
+  }
+
+  a {
+    font-weight: bold;
+    text-decoration: none;
+    color: @highlight-color;
+  }
+
+  a:visited {
+    color: lighten(@highlight-color, 12%);
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+
+  article {
+    color: @content-text-color;
+  }
+}
+
+.pico-close {
+  height: auto !important;
+  width: auto !important;
+  padding: @close-padding;
+
+  font-size: 2*(@close-size - @close-padding*2) !important;
+  line-height: (@close-size - @close-padding*2) !important;
+
+  background-color: transparent !important;
+}
