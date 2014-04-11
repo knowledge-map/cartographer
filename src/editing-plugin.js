@@ -67,7 +67,7 @@ function addConnectionEditing(graph, nodes) {
   var kg = this;
 
   // Add dragging to join concepts
-  var draggable = nodes.selectAll('circle');
+  var draggable = nodes.selectAll('path');
 
   var dragPath;
   var endConcept;
@@ -82,9 +82,10 @@ function addConnectionEditing(graph, nodes) {
 
       // Create a path to drag
       dragPath = d3.select(this.parentNode)
-        .append('path')
+        .append('g')
         .classed('edgePath', true)
-        .attr('pointer-events', 'none');
+        .attr('pointer-events', 'none')
+          .append('path');
     })
     .on("drag", function(d) {
       // Draw the Path

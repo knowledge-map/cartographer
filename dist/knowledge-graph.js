@@ -13941,7 +13941,7 @@ function addConnectionEditing(graph, nodes) {
   var kg = this;
 
   // Add dragging to join concepts
-  var draggable = nodes.selectAll('circle');
+  var draggable = nodes.selectAll('path');
 
   var dragPath;
   var endConcept;
@@ -13956,9 +13956,10 @@ function addConnectionEditing(graph, nodes) {
 
       // Create a path to drag
       dragPath = d3.select(this.parentNode)
-        .append('path')
+        .append('g')
         .classed('edgePath', true)
-        .attr('pointer-events', 'none');
+        .attr('pointer-events', 'none')
+          .append('path');
     })
     .on("drag", function(d) {
       // Draw the Path
@@ -14145,20 +14146,31 @@ Used in addition to the default node rendering function
 function drawHamburgers(graph, nodes) {
   var kg = this;
 
+  // Create a semi-circle path function
+  var semicircle = d3.svg.arc()
+    .outerRadius(20)
+    .startAngle(3*Math.PI/2)
+    .endAngle(5*Math.PI/2);
+
   // Add enter/above
-  var enter = nodes.insert('circle', 'rect')
+  var enter = nodes.insert('path', 'rect')
     .classed('enter', true)
-    .attr('r', 25)
-    .attr('cy', function() {
-      return -nodes.selectAll('rect').attr('height')/2;
+    .attr('d', semicircle)
+    .attr('transform', function() {
+      return 'translate(0,' + (-nodes.selectAll('rect').attr('height')/2) + ')';
     });
+
+  // Flip the semi-circle
+  semicircle
+    .startAngle(Math.PI/2)
+    .endAngle(3*Math.PI/2);
   
   // Add exit/below
-  var exit = nodes.insert('circle', 'rect')
+  var exit = nodes.insert('path', 'rect')
     .classed('exit', true)
-    .attr('r', 25)
-    .attr('cy', function() {
-      return nodes.selectAll('rect').attr('height')/2;
+    .attr('d', semicircle)
+    .attr('transform', function() {
+      return 'translate(0,' + (nodes.selectAll('rect').attr('height')/2) + ')';
     });
 }
 
