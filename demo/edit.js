@@ -4,26 +4,26 @@ var knowledge = {
   concepts: [
     {
       id: "edit",
-      name: "Click here to edit!"
+      name: "Click here!"
     },
     {
       id: "dependency",
-      name: "Click the top of the concept to add a dependency concept",
+      name: "Click the top",
       dependencies: ["edit"]
     },
     {
       id: "dependent",
-      name: "Click the bottom of the concept to add a dependent concept",
+      name: "Click the bottom",
       dependencies: ["edit"]
     },
     {
       id: "joining",
-      name: "Drag from one concept to another to add dependencies",
+      name: "Drag between disconnected concepts",
       dependencies: ["edit"]
     },
     {
       id: "removing",
-      name: "Drag between a concept and its dependency to remove the connection",
+      name: "Drag between connected concepts",
       dependencies: ["joining"]
     }
   ]
