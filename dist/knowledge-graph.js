@@ -14328,6 +14328,10 @@ Offsets the in/out edges to above/below given nodes
 Replaces the default dagre-d3 PositionEdgePaths function
 */
 function positionEdgePaths(g, svgEdgePaths) {
+  // Add an ID to each edge
+  svgEdgePaths
+    .attr('id', function(d) { return d; });
+
   var interpolate = this._edgeInterpolate,
       tension = this._edgeTension;
 
@@ -14450,9 +14454,20 @@ var KnowledgeGraph = function(api, config) {
 
   // Add transitions for graph updates
   renderer.transition(function(selection) {
-    return selection
-      .transition()
-        .duration(500);
+    var duration;
+    if (config && config.transitionDuration !== undefined) {
+      duration = config.transitionDuration;
+    } else {
+      duration = 500;
+    }
+
+    if (duration) {
+      return selection
+        .transition()
+          .duration(duration);
+    } else {
+      return selection;
+    }
   });
 
   // Add enter/exit circles
@@ -14744,6 +14759,11 @@ function addNodeModalEvents(graph, nodes) {
         // Oops.
         html += '<p>This node has no content!</p>';
       } else {
+	    // Function to generate an article with a header and content
+        function article(header, content) {
+          return '<article><header>' + header + '</header><p>' + content + '</p></article>';
+        };
+
         // Fuse content into HTML template.
         if(texts.length) {
           html += texts.map(function(content) {
@@ -14758,15 +14778,12 @@ function addNodeModalEvents(graph, nodes) {
             return article('<a href="' + content.link + '"><h2>' + content.title + '</h2></a>', content.description);
           }).join('');
         }
-
-        function article(header, content) {
-          return '<article><header>' + header + '</header><p>' + content + '</p></article>';
-        };
       }
 
       modal({
         content: html,
-        closeButton: true
+        closeButton: true,
+        width: 700,
       });
     });
 }

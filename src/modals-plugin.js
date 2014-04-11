@@ -28,6 +28,11 @@ function addNodeModalEvents(graph, nodes) {
         // Oops.
         html += '<p>This node has no content!</p>';
       } else {
+	    // Function to generate an article with a header and content
+        function article(header, content) {
+          return '<article><header>' + header + '</header><p>' + content + '</p></article>';
+        };
+
         // Fuse content into HTML template.
         if(texts.length) {
           html += texts.map(function(content) {
@@ -42,10 +47,6 @@ function addNodeModalEvents(graph, nodes) {
             return article('<a href="' + content.link + '"><h2>' + content.title + '</h2></a>', content.description);
           }).join('');
         }
-
-        function article(header, content) {
-          return '<article><header>' + header + '</header><p>' + content + '</p></article>';
-        };
       }
 
       modal({
