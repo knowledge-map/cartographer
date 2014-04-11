@@ -13,24 +13,28 @@ json: TODO describe what the json should look like
 */
 var createGraph = function(json) {
   var graph = new dagreD3.Digraph();
-  // Add all the concepts as nodes
-  json.concepts.forEach(function(concept) {
-    graph.addNode(concept.id, {
-     label: concept.name,
-     concept: concept,
-    });
-  });
-  // Check each concept for dependencies and add them as edges
-  json.concepts.forEach(function(concept) {
-    if (Array.isArray(concept.dependencies)) {
-      concept.dependencies.forEach(function(dep) {
-        // Add an edge from the dependency to the concept with a null edge ID
-        graph.addEdge(null, dep, concept.id);
+
+  if (json && json.concepts) {
+    // Add all the concepts as nodes
+    json.concepts.forEach(function(concept) {
+      graph.addNode(concept.id, {
+       label: concept.name,
+       concept: concept,
       });
-    } else {
-      // Dependencies is undefine/not an array and we'll figure out what to do with it later
-    }
-  });
+    });
+    // Check each concept for dependencies and add them as edges
+    json.concepts.forEach(function(concept) {
+      if (Array.isArray(concept.dependencies)) {
+        concept.dependencies.forEach(function(dep) {
+          // Add an edge from the dependency to the concept with a null edge ID
+          graph.addEdge(dep+'-'+concept.id, dep, concept.id);
+        });
+      } else {
+        // Dependencies is undefine/not an array and we'll figure out what to do with it later
+      }
+    });
+  }
+
   return graph;
 };
 
@@ -100,7 +104,7 @@ Adds entry and exit points for edges into concept elements
 Used in addition to the default node rendering function
 
 */
-function drawEntryExit(graph, nodes) {
+function drawHamburgers(graph, nodes) {
   var kg = this;
 
   // Add enter/above
@@ -118,155 +122,28 @@ function drawEntryExit(graph, nodes) {
     .attr('cy', function() {
       return nodes.selectAll('rect').attr('height')/2;
     });
-
-  // Add dragging to join concepts
-  var draggable = nodes.selectAll('circle');
-
-  var dragPath;
-  var endConcept;
-  var line = d3.svg.line()
-    .interpolate('bundle');
-
-  // Create dragging behaviour
-  var drag = d3.behavior.drag()
-    .on("dragstart", function(d) {
-      // Stop zooming and ignore mouse-entering this concept
-      d3.event.sourceEvent.stopPropagation();
-
-      // Create a path to drag
-      dragPath = d3.select(this.parentNode)
-        .append('path')
-        .classed('edgePath', true)
-        .attr('pointer-events', 'none');
-    })
-    .on("drag", function(d) {
-      // Draw the Path
-      dragPath.attr('d', line([[0,d3.select(this).attr('cy')], [d3.event.x, d3.event.y]]));
-    })
-    .on("dragend", function(d) {
-      // Remove the line
-      dragPath.remove();
-      
-      // Get the concept dragged from
-      var startConcept = kg.graph.node(d).concept;
-
-      // Add the dependency to the graph
-      if (endConcept) {
-        // Get which circle was dragged from
-        var isEnter = d3.select(this).classed('enter');
-        var isExit = d3.select(this).classed('exit');
-
-        // Add a new concept if we didn't drag to another concept
-        if (startConcept.id === endConcept.id) {
-          endConcept = {
-            id: "node-"+kg.graph.nodes().length,
-            name: 'New Concept '+kg.graph.nodes().length,
-          };
-
-          kg.addConcept({concept: endConcept});
-        }
-
-        // Add the dependency according to whether we started dragging
-        // from the enter or exit circle
-        if (isEnter) {
-          kg.addDependency({concept: startConcept, dependency: endConcept.id});
-        } else if (isExit){
-          kg.addDependency({concept: endConcept, dependency: startConcept.id});
-        }
-      }
-    });
-
-  draggable.call(drag);
-
-  // Set the moused-over objects as the concept to join to
-  nodes
-    .attr('pointer-events', 'mouseover')
-    .on('mouseover', function(d) {
-      endConcept = kg.graph.node(d).concept;
-    })
-    .on('mouseout', function(d) {
-      endConcept = null;
-    });
-
-  return nodes;
 }
 
 /*
-Takes node elements and adds functionality for
-replacing label with input element when clicked
 
-Used in addition to the default node rendering function
+Construct a knowledge graph object.
 
-*/
-function addChangeableLabels(graph, nodes) {
-  var kg = this;
-
-  nodes.select('text')
-    .on('click', function(conceptId) {
-      var concept = kg.graph.node(conceptId);
-
-      var text = this;
-      var textgroup = d3.select(this.parentNode);
-
-      // Create the input element
-      var obj = textgroup
-        .append('foreignObject')
-          .attr('width', text.getBBox().width)
-          .attr('height', text.getBBox().height);
-
-      var input = obj
-        .append('xhtml:input')
-          .attr('width', text.getBBox().width)
-          .attr('height', text.getBBox().height)
-          .attr('value', concept.label);
-
-      // Focus element to allow user to immeadiately enter text
-      input[0][0].focus();
-
-      // Change back to text on focus removal
-      input.on('blur', function(conceptId) {
-        // Replace node label
-        concept.label = this.value;
-        concept.concept.name = this.value;
-
-        // Add this back into the graph
-        kg.graph.node(concept.concept.id, concept);
-        kg.render();
-
-        // Remove
-        obj.remove();
-      });
-
-      // Blur if enter key is pressed
-      input.on('keypress', function() {
-        var ENTER_KEY = 13;
-        if (d3.event.keyCode === ENTER_KEY) {
-          input[0][0].blur();
-        }
-      });
-    });
-}
-
-
-/*
-
-The knowledgeGraph object is the public API for the knowledge-graph library
+Accepts a single object:
+  config: an object that contains the data about the graph and various other
+  options
+  The available options are:
+    graph: a JSON object that contains the graph data
+    plugins: a list of plugin names or plugin objects
 
 */
-var knowledgeGraph = new function() {
-/*
-
-Create a knowledge graph display that layouts out the entire graph.
-
-config: an object that contains the data about the graph and various other
-options
-The available options are:
-  graph: a JSON object that contains the graph data
-
-*/
-this.create = function(config) {
+var KnowledgeGraph = function(api, config) {
   // Create the directed graph
-  var graph = this.graph = createGraph(config.graph);
+  var graph;
+  if (config && config.graph) {
+    graph = this.graph = createGraph(config.graph);
+  } else {
+    graph = this.graph = createGraph(); 
+  }
 
   // Create an element on the page for us to render our graph in
   var element = this.element = d3.select('body').append('svg');
@@ -290,102 +167,214 @@ this.create = function(config) {
   var drawNodes = renderer.drawNodes();
   renderer.drawNodes(function(graph, element) {
     var nodes = drawNodes(graph, element);
-    drawEntryExit.call(kg, graph, nodes);
-    addChangeableLabels.call(kg, graph, nodes);
+
+    // Add class labels
+    nodes.attr('id', function(d) { return d; });
+
+    // Add burger buns
+    drawHamburgers.call(kg, graph, nodes);
+
+    // Add interactivity
+    kg.postEvent({
+      type: 'renderGraph',
+      graph: graph,
+      nodes: nodes
+    });
 
     return nodes;
   });
 
+  /*
+  Message API
+  */
+  this.dispatcher = {};
+
+  this.postEvent = function(e) {
+    if(this.dispatcher[e.type]) {
+      var callbacks = this.dispatcher[e.type];
+      callbacks.forEach(function(callback) {
+        callback(e);
+      });
+    }
+  };
+
+  this.onEvent = function(type, callback) {
+    if(undefined === this.dispatcher[type]) {
+      this.dispatcher[type] = [];
+    }
+    this.dispatcher[type].push(callback);
+  };
+
+  /*
+  Adds a concept to the graph and then updates the graph rendering
+
+  config:
+    concept: The concept object to add
+    dependents: A list of concept ids dependent on this one
+  */
+  this.addConcept = function(config) {
+    var kg = this;
+
+    // Add node to the graph
+    this.graph.addNode(config.concept.id, {
+      label: config.concept.name,
+      concept: config.concept,
+    });
+
+    // Add dependent edges to the graph
+    if (config.dependents) {
+      config.dependents.forEach(function(dep) {
+        kg.addDependency({
+          concept: kg.graph.node(dep).concept,
+          dependency: config.concept.id,
+        });
+      });
+    }
+
+    // Add dependency edges to the graph
+    if (config.concept.dependencies) {
+      config.concept.dependencies.forEach(function(dep) {
+        kg.addDependency({
+          concept: config.concept,
+          dependency: dep,
+        });
+      });
+    }
+
+    // Update the graph display
+    this.render();
+  };
+
+  /*
+
+  Adds a dependency to the graph and then updates the graph rendering
+
+  config:
+    concept: the concept which depends on another concept
+    dependency: the id of the concept which is depended on
+  */
+  this.addDependency = function(config) {
+    // Get ids of the concepts
+    var concept = config.concept;
+    var dep = config.dependency;
+
+    // Add the dependency to the list of the concept's dependencies
+    if (concept.dependencies && concept.dependencies.indexOf(dep) === -1) {
+      concept.dependencies.push(dep);
+    } else {
+      concept.dependencies = [dep];
+    }
+
+    // Add the edge to the graph
+    this.graph.addEdge(dep+'-'+concept.id, dep, concept.id);
+
+    // Update the graph display
+    this.render();
+  };
+
+  /*
+
+  Removes a dependency from the graph and then updates the graph rendering
+
+  */
+  this.removeDependency = function(config) {
+    // Get ids of concepts
+    var con = config.concept;
+    var dep = config.dependency;
+
+    // Remove the dependency from the concept
+    var concept = this.graph.node(con).concept;
+    if (concept.dependencies) {
+      var index = concept.dependencies.indexOf(dep);
+      concept.dependencies.splice(index, 1);
+    }
+
+    // Remove the edge from the graph
+    this.graph.delEdge(dep+'-'+con);
+
+    // Update the graph display
+    this.render();
+  };
+
+  /*
+  
+  Returns true if the graph has this dependency and false otherwise
+
+  */
+  this.hasDependency = function(config) {
+    // Get ids of concepts
+    var concept = config.concept;
+    var dep = config.dependency;
+
+    // Return true if edge exists
+    return this.graph.hasEdge(dep+'-'+concept);
+  };
+
+  /*
+
+  Renders/rerenders the graph elements
+
+  */
+  this.render = function() {
+    // Run the renderer
+    this.renderer.run(this.graph, this.element);
+    
+    // Don't add another element for the zoom
+    this.renderer.zoomSetup(function(graph, element) {
+      this.element = element;
+      return element;
+    });
+  };
+
+  // Initialise plugins for graph.
+  if(config && config.plugins) {
+    for(var i = 0; i < config.plugins.length; i++) {
+      var plugin = config.plugins[i];
+      if('string' === typeof(plugin)) {
+        plugin = api.plugins[plugin];
+      }
+      if(plugin && plugin.run) {
+        plugin.run(this);
+      }
+    }
+    this.__defineGetter__('plugins', function() {
+      return config.plugins;
+    });
+    this.__defineSetter__('plugins', function() {});
+  }
+
   // Display the graph
   this.render();
-};
 
-/*
-Adds a concept to the graph and then updates the graph rendering
-
-config:
-  concept: The concept object to add
-  dependents: A list of concept ids dependent on this one
-*/
-this.addConcept = function(config) {
-  var kg = this;
-
-  // Add node to the graph
-  this.graph.addNode(config.concept.id, {
-    label: config.concept.name,
-    concept: config.concept,
-  });
-
-  // Add dependent edges to the graph
-  if (config.dependents) {
-    config.dependents.forEach(function(dep) {
-      kg.addDependency({
-        concept: kg.graph.node(dep).concept,
-        dependency: config.concept.id,
-      });
-    });
-  }
-
-  // Add dependency edges to the graph
-  if (config.concept.dependencies) {
-    config.concept.dependencies.forEach(function(dep) {
-      kg.addDependency({
-        concept: config.concept,
-        dependency: dep,
-      });
-    });
-  }
-
-  // Update the graph display
-  this.render();
-};
-
-/*
-
-Adds a dependency to the graph and then updates the graph rendering
-
-config:
-  concept: the concept which depends on another concept
-  dependency: the id of the concept which is depended on
-*/
-this.addDependency = function(config) {
-  // Get ids of the concepts
-  var concept = config.concept;
-  var dep = config.dependency;
-
-  // Add the dependency to the list of the concept's dependencies
-  if (concept.dependencies && concept.dependencies.indexOf(dep) === -1) {
-    concept.dependencies.push(dep);
-  } else {
-    concept.dependencies = [dep];
-  }
-
-  // Add the edge to the graph
-  this.graph.addEdge(null, dep, concept.id);
-
-  // Update the graph display
-  this.render();
-};
-
-
-/*
-
-Renders/rerenders the graph elements
-
-*/
-this.render = function() {
-  // Run the renderer
-  this.renderer.run(this.graph, this.element);
-  
-  // Don't add another element for the zoom
-  this.renderer.zoomSetup(function(graph, element) {
-    this.element = element;
-    return element;
-  });
-};
-  
   return this;
-}();
+};
 
-global.knowledgeGraph = knowledgeGraph; 
-module.exports = knowledgeGraph;
+/*
+
+Public API for the knowledge-graph library
+
+*/
+var api = {
+  /*
+
+  Create a knowledge graph display that layouts out the entire graph.
+
+  */
+  create: function(config) {
+    return new KnowledgeGraph(this, config);
+  },
+
+  plugins: {
+    'links': require('./links-plugin.js'),
+    'editing': require('./editing-plugin.js'),
+  },
+
+  registerPlugin: function(plugin) {
+    if(plugin && plugin.name && plugin.run) {
+      this.plugins[plugin.name] = plugin;
+    }
+  }
+};
+
+global.knowledgeGraph = api; 
+module.exports = api;
