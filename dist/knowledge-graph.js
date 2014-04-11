@@ -14455,7 +14455,7 @@ var KnowledgeGraph = function(api, config) {
   // Add transitions for graph updates
   renderer.transition(function(selection) {
     var duration;
-    if (config) {
+    if (config && config.transitionDuration !== undefined) {
       duration = config.transitionDuration;
     } else {
       duration = 500;
