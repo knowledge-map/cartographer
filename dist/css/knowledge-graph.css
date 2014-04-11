@@ -1,6 +1,7 @@
 text {
   font-family: 'Fira', sans-serif;
   fill: #000000;
+  cursor: pointer;
 }
 .node .enter {
   fill: #cccccc;
@@ -22,6 +23,7 @@ text {
 text {
   font-family: 'Fira', sans-serif;
   fill: #000000;
+  cursor: pointer;
 }
 .node .enter {
   fill: #cccccc;
