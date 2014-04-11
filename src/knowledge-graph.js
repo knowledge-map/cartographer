@@ -46,6 +46,10 @@ Offsets the in/out edges to above/below given nodes
 Replaces the default dagre-d3 PositionEdgePaths function
 */
 function positionEdgePaths(g, svgEdgePaths) {
+  // Add an ID to each edge
+  svgEdgePaths
+    .attr('id', function(d) { return d; });
+
   var interpolate = this._edgeInterpolate,
       tension = this._edgeTension;
 
@@ -168,9 +172,20 @@ var KnowledgeGraph = function(api, config) {
 
   // Add transitions for graph updates
   renderer.transition(function(selection) {
-    return selection
-      .transition()
-        .duration(500);
+    var duration;
+    if (config) {
+      duration = config.transitionDuration;
+    } else {
+      duration = 500;
+    }
+
+    if (duration) {
+      return selection
+        .transition()
+          .duration(duration);
+    } else {
+      return selection;
+    }
   });
 
   // Add enter/exit circles
@@ -378,6 +393,7 @@ var api = {
   plugins: {
     'links': require('./links-plugin.js'),
     'editing': require('./editing-plugin.js'),
+    'modals': require('./modals-plugin.js'),
   },
 
   registerPlugin: function(plugin) {

@@ -1,4 +1,247 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/**
+ * Copyright (c) 2012 James Frasca
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+/**
+ * A self-contained modal library
+ */
+!function (name, definition) {
+
+    if (typeof module != 'undefined') module.exports = definition()
+    else if (typeof define == 'function' && typeof define.amd == 'object') define(definition)
+    else this[name] = definition()
+
+}('picoModal', function () {
+
+    var picoModal = (function(window, document) {
+        "use strict";
+
+        // Generates observable objects that can be watched and triggered
+        var observable = function() {
+            var callbacks = [];
+            return {
+                watch: function(callback) {
+                           callbacks.push(callback);
+                       },
+        trigger: function() {
+                     for (var i = 0; i < callbacks.length; i++) {
+                         window.setTimeout(callbacks[i], 1);
+                     }
+                 }
+            };
+        };
+
+        // A small interface for creating and managing a dom element
+        var make = function( parent ) {
+
+            var elem = document.createElement('div');
+            (parent || document.body).appendChild(elem);
+
+            var iface = {
+
+                elem: elem,
+
+                // Creates a child of this node
+                child: function () {
+                    return make(elem);
+                },
+
+                // Applies a set of styles to an element
+                stylize: function(styles) {
+                             styles = styles || {};
+
+                             if ( typeof styles.opacity !== "undefined" ) {
+                                 styles.filter =
+                                     "alpha(opacity=" + (styles.opacity * 100) + ")";
+                             }
+
+                             for (var prop in styles) {
+                                 if (styles.hasOwnProperty(prop)) {
+                                     elem.style[prop] = styles[prop];
+                                 }
+                             }
+
+                             return iface;
+                         },
+
+                // Adds a class name
+                clazz: function (clazz) {
+                           elem.className += clazz;
+                           return iface;
+                       },
+
+                // Sets the HTML
+                html: function (content) {
+                          elem.innerHTML = content;
+                          return iface;
+                      },
+
+                // Returns the width of this element
+                getWidth: function () {
+                              return elem.clientWidth;
+                          },
+
+                // Adds a click handler to this element
+                onClick: function(callback) {
+                             if (elem.attachEvent) {
+                                 elem.attachEvent('onclick', callback);
+                             }
+                             else {
+                                 elem.addEventListener('click', callback);
+                             }
+
+                             return iface;
+                         },
+
+                // Removes this element from the DOM
+                destroy: function() {
+                             document.body.removeChild(elem);
+                             return iface;
+                         }
+
+            };
+
+            return iface;
+        };
+
+        // An interface for generating the grey-out effect
+        var overlay = function( getOption ) {
+
+            // The registered on click events
+            var clickCallbacks = observable();
+
+            // The overlay element
+            var elem = make()
+                .clazz("pico-overlay")
+                .stylize({
+                    display: "block",
+                    position: "fixed",
+                    top: "0px",
+                    left: "0px",
+                    height: "100%",
+                    width: "100%",
+                    zIndex: 10000
+                })
+            .stylize( getOption('overlayStyles', {
+                opacity: 0.5,
+                background: "#000"
+            }) )
+            .onClick(clickCallbacks.trigger);
+
+            return {
+                elem: elem.elem,
+                    destroy: elem.destroy,
+                    onClick: clickCallbacks.watch
+            };
+        };
+
+        // A function for easily displaying a modal with the given content
+        return function(options) {
+
+            if ( typeof options === "string" ) {
+                options = { content: options };
+            }
+
+            // Returns a named option if it has been explicitly defined. Otherwise,
+            // it returns the given default value
+            function getOption ( opt, defaultValue ) {
+                return options[opt] === void(0) ? defaultValue : options[opt];
+            }
+
+            var shadow = overlay( getOption );
+
+            var closeCallbacks = observable();
+
+            var elem = make()
+                .clazz("pico-content")
+                .stylize({
+                    display: 'block',
+                    position: 'fixed',
+                    zIndex: 10001,
+                    left: "50%",
+                    top: "50px"
+                })
+            .html(options.content);
+
+            var width = getOption('width', elem.getWidth());
+
+            elem
+                .stylize({
+                    width: width + "px",
+                    margin: "0 0 0 " + (-(width / 2) + "px")
+                })
+            .stylize( getOption('modalStyles', {
+                backgroundColor: "white",
+                padding: "20px",
+                borderRadius: "5px"
+            }) );
+
+            var close = function () {
+                closeCallbacks.trigger();
+                shadow.destroy();
+                elem.destroy();
+            };
+
+            if ( getOption('overlayClose', true) ) {
+                shadow.onClick(close);
+            }
+
+            var closeButton;
+            if ( getOption('closeButton', true) ) {
+                closeButton = elem.child()
+                    .html( getOption('closeHtml', "&#xD7;") )
+                    .clazz("pico-close")
+                    .stylize( getOption('closeStyles', {
+                        borderRadius: "2px",
+                        cursor: "pointer",
+                        height: "15px",
+                        width: "15px",
+                        position: "absolute",
+                        top: "5px",
+                        right: "5px",
+                        fontSize: "16px",
+                        textAlign: "center",
+                        lineHeight: "15px",
+                        background: "#CCC"
+                    }) )
+                .onClick(close);
+            }
+
+            return {
+                modalElem: elem.elem,
+                closeElem: closeButton ? closeButton.elem : null,
+                overlayElem: shadow.elem,
+                close: close,
+                onClose: closeCallbacks.watch
+            };
+        };
+
+    }(window, document));
+
+    return picoModal;
+
+});
+
+},{}],2:[function(require,module,exports){
 d3 = function() {
   var d3 = {
     version: "3.3.13"
@@ -9292,12 +9535,12 @@ d3 = function() {
   });
   return d3;
 }();
-},{}],2:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 require("./d3");
 module.exports = d3;
 (function () { delete this.d3; })(); // unset global
 
-},{"./d3":1}],3:[function(require,module,exports){
+},{"./d3":2}],4:[function(require,module,exports){
 /**
  * @license
  * Copyright (c) 2012-2013 Chris Pettitt
@@ -9328,7 +9571,7 @@ module.exports =  {
   version: require('./lib/version')
 };
 
-},{"./lib/Renderer":4,"./lib/version":5,"dagre":11,"graphlib":28}],4:[function(require,module,exports){
+},{"./lib/Renderer":5,"./lib/version":6,"dagre":12,"graphlib":29}],5:[function(require,module,exports){
 var layout = require('dagre').layout;
 
 var d3;
@@ -9859,15 +10102,15 @@ function bind(func, thisArg) {
   };
 }
 
-},{"d3":2,"dagre":11}],5:[function(require,module,exports){
+},{"d3":3,"dagre":12}],6:[function(require,module,exports){
 module.exports = '0.1.6-pre';
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 exports.Set = require('./lib/Set');
 exports.PriorityQueue = require('./lib/PriorityQueue');
 exports.version = require('./lib/version');
 
-},{"./lib/PriorityQueue":7,"./lib/Set":8,"./lib/version":10}],7:[function(require,module,exports){
+},{"./lib/PriorityQueue":8,"./lib/Set":9,"./lib/version":11}],8:[function(require,module,exports){
 module.exports = PriorityQueue;
 
 /**
@@ -10018,7 +10261,7 @@ PriorityQueue.prototype._swap = function(i, j) {
   keyIndices[origArrI.key] = j;
 };
 
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 var util = require('./util');
 
 module.exports = Set;
@@ -10156,7 +10399,7 @@ function values(o) {
   return result;
 }
 
-},{"./util":9}],9:[function(require,module,exports){
+},{"./util":10}],10:[function(require,module,exports){
 /*
  * This polyfill comes from
  * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/isArray
@@ -10215,10 +10458,10 @@ if ('function' !== typeof Array.prototype.reduce) {
   };
 }
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 module.exports = '1.1.3';
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 /*
 Copyright (c) 2012-2013 Chris Pettitt
 
@@ -10245,7 +10488,7 @@ exports.Graph = require("graphlib").Graph;
 exports.layout = require("./lib/layout");
 exports.version = require("./lib/version");
 
-},{"./lib/layout":12,"./lib/version":27,"graphlib":28}],12:[function(require,module,exports){
+},{"./lib/layout":13,"./lib/version":28,"graphlib":29}],13:[function(require,module,exports){
 var util = require('./util'),
     rank = require('./rank'),
     order = require('./order'),
@@ -10514,7 +10757,7 @@ module.exports = function() {
 };
 
 
-},{"./order":13,"./position":18,"./rank":19,"./util":26,"graphlib":28}],13:[function(require,module,exports){
+},{"./order":14,"./position":19,"./rank":20,"./util":27,"graphlib":29}],14:[function(require,module,exports){
 var util = require('./util'),
     crossCount = require('./order/crossCount'),
     initLayerGraphs = require('./order/initLayerGraphs'),
@@ -10629,7 +10872,7 @@ function sweepUp(g, layerGraphs) {
   }
 }
 
-},{"./order/crossCount":14,"./order/initLayerGraphs":15,"./order/initOrder":16,"./order/sortLayer":17,"./util":26}],14:[function(require,module,exports){
+},{"./order/crossCount":15,"./order/initLayerGraphs":16,"./order/initOrder":17,"./order/sortLayer":18,"./util":27}],15:[function(require,module,exports){
 var util = require('../util');
 
 module.exports = crossCount;
@@ -10686,7 +10929,7 @@ function twoLayerCrossCount(g, layer1, layer2) {
   return cc;
 }
 
-},{"../util":26}],15:[function(require,module,exports){
+},{"../util":27}],16:[function(require,module,exports){
 var nodesFromList = require('graphlib').filter.nodesFromList,
     /* jshint -W079 */
     Set = require('cp-data').Set;
@@ -10737,7 +10980,7 @@ function initLayerGraphs(g) {
   return layerGraphs;
 }
 
-},{"cp-data":6,"graphlib":28}],16:[function(require,module,exports){
+},{"cp-data":7,"graphlib":29}],17:[function(require,module,exports){
 var crossCount = require('./crossCount'),
     util = require('../util');
 
@@ -10775,7 +11018,7 @@ function initOrder(g, random) {
   g.graph().orderCC = Number.MAX_VALUE;
 }
 
-},{"../util":26,"./crossCount":14}],17:[function(require,module,exports){
+},{"../util":27,"./crossCount":15}],18:[function(require,module,exports){
 var util = require('../util');
 /*
     Digraph = require('graphlib').Digraph,
@@ -10940,7 +11183,7 @@ function findViolatedConstraint(cg, nodeData) {
 }
 */
 
-},{"../util":26}],18:[function(require,module,exports){
+},{"../util":27}],19:[function(require,module,exports){
 var util = require('./util');
 
 /*
@@ -11380,7 +11623,7 @@ module.exports = function() {
   }
 };
 
-},{"./util":26}],19:[function(require,module,exports){
+},{"./util":27}],20:[function(require,module,exports){
 var util = require('./util'),
     acyclic = require('./rank/acyclic'),
     initRank = require('./rank/initRank'),
@@ -11518,7 +11761,7 @@ function normalize(g) {
   g.eachNode(function(u, node) { node.rank -= m; });
 }
 
-},{"./rank/acyclic":20,"./rank/constraints":21,"./rank/feasibleTree":22,"./rank/initRank":23,"./rank/simplex":25,"./util":26,"graphlib":28}],20:[function(require,module,exports){
+},{"./rank/acyclic":21,"./rank/constraints":22,"./rank/feasibleTree":23,"./rank/initRank":24,"./rank/simplex":26,"./util":27,"graphlib":29}],21:[function(require,module,exports){
 var util = require('../util');
 
 module.exports = acyclic;
@@ -11581,7 +11824,7 @@ function undo(g) {
   });
 }
 
-},{"../util":26}],21:[function(require,module,exports){
+},{"../util":27}],22:[function(require,module,exports){
 exports.apply = function(g) {
   function dfs(sg) {
     var rankSets = {};
@@ -11750,7 +11993,7 @@ exports.relax = function(g) {
   });
 };
 
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require('cp-data').Set,
 /* jshint +W079 */
@@ -11875,7 +12118,7 @@ function slack(g, u, v) {
   return rankDiff - maxMinLen;
 }
 
-},{"../util":26,"cp-data":6,"graphlib":28}],23:[function(require,module,exports){
+},{"../util":27,"cp-data":7,"graphlib":29}],24:[function(require,module,exports){
 var util = require('../util'),
     topsort = require('graphlib').alg.topsort;
 
@@ -11907,7 +12150,7 @@ function initRank(g) {
   });
 }
 
-},{"../util":26,"graphlib":28}],24:[function(require,module,exports){
+},{"../util":27,"graphlib":29}],25:[function(require,module,exports){
 module.exports = {
   slack: slack
 };
@@ -11925,7 +12168,7 @@ function slack(graph, u, v, minLen) {
   return Math.abs(graph.node(u).rank - graph.node(v).rank) - minLen;
 }
 
-},{}],25:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 var util = require('../util'),
     rankUtil = require('./rankUtil');
 
@@ -12235,7 +12478,7 @@ function minimumLength(graph, u, v) {
   }
 }
 
-},{"../util":26,"./rankUtil":24}],26:[function(require,module,exports){
+},{"../util":27,"./rankUtil":25}],27:[function(require,module,exports){
 /*
  * Returns the smallest value in the array.
  */
@@ -12354,10 +12597,10 @@ log.level = 0;
 
 exports.log = log;
 
-},{}],27:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 module.exports = '0.4.5';
 
-},{}],28:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 exports.Graph = require("./lib/Graph");
 exports.Digraph = require("./lib/Digraph");
 exports.CGraph = require("./lib/CGraph");
@@ -12390,7 +12633,7 @@ exports.filter = {
 
 exports.version = require("./lib/version");
 
-},{"./lib/CDigraph":30,"./lib/CGraph":31,"./lib/Digraph":32,"./lib/Graph":33,"./lib/alg/components":34,"./lib/alg/dijkstra":35,"./lib/alg/dijkstraAll":36,"./lib/alg/findCycles":37,"./lib/alg/floydWarshall":38,"./lib/alg/isAcyclic":39,"./lib/alg/postorder":40,"./lib/alg/preorder":41,"./lib/alg/prim":42,"./lib/alg/tarjan":43,"./lib/alg/topsort":44,"./lib/converter/json.js":46,"./lib/filter":47,"./lib/graph-converters":48,"./lib/version":50}],29:[function(require,module,exports){
+},{"./lib/CDigraph":31,"./lib/CGraph":32,"./lib/Digraph":33,"./lib/Graph":34,"./lib/alg/components":35,"./lib/alg/dijkstra":36,"./lib/alg/dijkstraAll":37,"./lib/alg/findCycles":38,"./lib/alg/floydWarshall":39,"./lib/alg/isAcyclic":40,"./lib/alg/postorder":41,"./lib/alg/preorder":42,"./lib/alg/prim":43,"./lib/alg/tarjan":44,"./lib/alg/topsort":45,"./lib/converter/json.js":47,"./lib/filter":48,"./lib/graph-converters":49,"./lib/version":51}],30:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -12587,7 +12830,7 @@ function delEdgeFromMap(map, v, e) {
 }
 
 
-},{"cp-data":6}],30:[function(require,module,exports){
+},{"cp-data":7}],31:[function(require,module,exports){
 var Digraph = require("./Digraph"),
     compoundify = require("./compoundify");
 
@@ -12624,7 +12867,7 @@ CDigraph.prototype.toString = function() {
   return "CDigraph " + JSON.stringify(this, null, 2);
 };
 
-},{"./Digraph":32,"./compoundify":45}],31:[function(require,module,exports){
+},{"./Digraph":33,"./compoundify":46}],32:[function(require,module,exports){
 var Graph = require("./Graph"),
     compoundify = require("./compoundify");
 
@@ -12661,7 +12904,7 @@ CGraph.prototype.toString = function() {
   return "CGraph " + JSON.stringify(this, null, 2);
 };
 
-},{"./Graph":33,"./compoundify":45}],32:[function(require,module,exports){
+},{"./Graph":34,"./compoundify":46}],33:[function(require,module,exports){
 /*
  * This file is organized with in the following order:
  *
@@ -12929,7 +13172,7 @@ Digraph.prototype._filterNodes = function(pred) {
 };
 
 
-},{"./BaseGraph":29,"./util":49,"cp-data":6}],33:[function(require,module,exports){
+},{"./BaseGraph":30,"./util":50,"cp-data":7}],34:[function(require,module,exports){
 /*
  * This file is organized with in the following order:
  *
@@ -13064,7 +13307,7 @@ Graph.prototype.delEdge = function(e) {
 };
 
 
-},{"./BaseGraph":29,"./util":49,"cp-data":6}],34:[function(require,module,exports){
+},{"./BaseGraph":30,"./util":50,"cp-data":7}],35:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -13107,7 +13350,7 @@ function components(g) {
   return results;
 }
 
-},{"cp-data":6}],35:[function(require,module,exports){
+},{"cp-data":7}],36:[function(require,module,exports){
 var PriorityQueue = require("cp-data").PriorityQueue;
 
 module.exports = dijkstra;
@@ -13187,7 +13430,7 @@ function dijkstra(g, source, weightFunc, incidentFunc) {
   return results;
 }
 
-},{"cp-data":6}],36:[function(require,module,exports){
+},{"cp-data":7}],37:[function(require,module,exports){
 var dijkstra = require("./dijkstra");
 
 module.exports = dijkstraAll;
@@ -13224,7 +13467,7 @@ function dijkstraAll(g, weightFunc, incidentFunc) {
   return results;
 }
 
-},{"./dijkstra":35}],37:[function(require,module,exports){
+},{"./dijkstra":36}],38:[function(require,module,exports){
 var tarjan = require("./tarjan");
 
 module.exports = findCycles;
@@ -13246,7 +13489,7 @@ function findCycles(g) {
   return tarjan(g).filter(function(cmpt) { return cmpt.length > 1; });
 }
 
-},{"./tarjan":43}],38:[function(require,module,exports){
+},{"./tarjan":44}],39:[function(require,module,exports){
 module.exports = floydWarshall;
 
 /**
@@ -13325,7 +13568,7 @@ function floydWarshall(g, weightFunc, incidentFunc) {
   return results;
 }
 
-},{}],39:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 var topsort = require("./topsort");
 
 module.exports = isAcyclic;
@@ -13351,7 +13594,7 @@ function isAcyclic(g) {
   return true;
 }
 
-},{"./topsort":44}],40:[function(require,module,exports){
+},{"./topsort":45}],41:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -13378,7 +13621,7 @@ function postorder(g, root, f) {
   dfs(root);
 }
 
-},{"cp-data":6}],41:[function(require,module,exports){
+},{"cp-data":7}],42:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -13405,7 +13648,7 @@ function preorder(g, root, f) {
   dfs(root);
 }
 
-},{"cp-data":6}],42:[function(require,module,exports){
+},{"cp-data":7}],43:[function(require,module,exports){
 var Graph = require("../Graph"),
     PriorityQueue = require("cp-data").PriorityQueue;
 
@@ -13476,7 +13719,7 @@ function prim(g, weightFunc) {
   return result;
 }
 
-},{"../Graph":33,"cp-data":6}],43:[function(require,module,exports){
+},{"../Graph":34,"cp-data":7}],44:[function(require,module,exports){
 module.exports = tarjan;
 
 /**
@@ -13544,7 +13787,7 @@ function tarjan(g) {
   return results;
 }
 
-},{}],44:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 module.exports = topsort;
 topsort.CycleException = CycleException;
 
@@ -13602,7 +13845,7 @@ CycleException.prototype.toString = function() {
   return "Graph has at least one cycle";
 };
 
-},{}],45:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 // This file provides a helper function that mixes-in Dot behavior to an
 // existing graph prototype.
 
@@ -13710,7 +13953,7 @@ function compoundify(SuperConstructor) {
   return Constructor;
 }
 
-},{"cp-data":6}],46:[function(require,module,exports){
+},{"cp-data":7}],47:[function(require,module,exports){
 var Graph = require("../Graph"),
     Digraph = require("../Digraph"),
     CGraph = require("../CGraph"),
@@ -13800,7 +14043,7 @@ function typeOf(obj) {
   return Object.prototype.toString.call(obj).slice(8, -1);
 }
 
-},{"../CDigraph":30,"../CGraph":31,"../Digraph":32,"../Graph":33}],47:[function(require,module,exports){
+},{"../CDigraph":31,"../CGraph":32,"../Digraph":33,"../Graph":34}],48:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -13816,7 +14059,7 @@ exports.nodesFromList = function(nodes) {
   };
 };
 
-},{"cp-data":6}],48:[function(require,module,exports){
+},{"cp-data":7}],49:[function(require,module,exports){
 var Graph = require("./Graph"),
     Digraph = require("./Digraph");
 
@@ -13855,7 +14098,7 @@ Digraph.prototype.asUndirected = function() {
   return g;
 };
 
-},{"./Digraph":32,"./Graph":33}],49:[function(require,module,exports){
+},{"./Digraph":33,"./Graph":34}],50:[function(require,module,exports){
 // Returns an array of all values for properties of **o**.
 exports.values = function(o) {
   var ks = Object.keys(o),
@@ -13868,10 +14111,10 @@ exports.values = function(o) {
   return result;
 };
 
-},{}],50:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 module.exports = '0.7.4';
 
-},{}],51:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 var d3 = require('d3');
 
 /*
@@ -14035,7 +14278,7 @@ module.exports = {
   run: setupEditing
 };
 
-},{"d3":2}],52:[function(require,module,exports){
+},{"d3":3}],53:[function(require,module,exports){
 (function (global){
 "use strict";
 
@@ -14085,6 +14328,10 @@ Offsets the in/out edges to above/below given nodes
 Replaces the default dagre-d3 PositionEdgePaths function
 */
 function positionEdgePaths(g, svgEdgePaths) {
+  // Add an ID to each edge
+  svgEdgePaths
+    .attr('id', function(d) { return d; });
+
   var interpolate = this._edgeInterpolate,
       tension = this._edgeTension;
 
@@ -14207,9 +14454,20 @@ var KnowledgeGraph = function(api, config) {
 
   // Add transitions for graph updates
   renderer.transition(function(selection) {
-    return selection
-      .transition()
-        .duration(500);
+    var duration;
+    if (config) {
+      duration = config.transitionDuration;
+    } else {
+      duration = 500;
+    }
+
+    if (duration) {
+      return selection
+        .transition()
+          .duration(duration);
+    } else {
+      return selection;
+    }
   });
 
   // Add enter/exit circles
@@ -14417,6 +14675,7 @@ var api = {
   plugins: {
     'links': require('./links-plugin.js'),
     'editing': require('./editing-plugin.js'),
+    'modals': require('./modals-plugin.js'),
   },
 
   registerPlugin: function(plugin) {
@@ -14430,7 +14689,7 @@ global.knowledgeGraph = api;
 module.exports = api;
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./editing-plugin.js":51,"./links-plugin.js":53,"d3":2,"dagre-d3":3}],53:[function(require,module,exports){
+},{"./editing-plugin.js":52,"./links-plugin.js":54,"./modals-plugin.js":55,"d3":3,"dagre-d3":4}],54:[function(require,module,exports){
 var d3 = require('d3');
 
 function addNodeLinks(graph, nodes) {
@@ -14469,4 +14728,74 @@ module.exports = {
   run: setupLinks,
 };
 
-},{"d3":2}]},{},[52])
+},{"d3":3}],55:[function(require,module,exports){
+var d3 = require('d3');
+var modal = require('../node_modules/PicoModal/src/picoModal.js');
+
+function addNodeModalEvents(graph, nodes) {
+  nodes.select('text')
+    .on('click', function(conceptId) {
+      var concept = graph.node(conceptId).concept;
+      var contents = concept.content;
+      if(!contents || !contents.forEach) {
+        return;
+      }
+      var title = concept.name;
+      var texts = [];
+      var links = [];
+
+      // Collect different content types.
+      contents.forEach(function(content) {
+        if(content.link) {
+          links.push(content);
+        } else if(content.text) {
+          content.toString = function() { return this.text; };
+          texts.push(content);
+        }
+      });
+
+      var html = '<h1>' + title + '</h1>';
+      if(!texts.length && !links.length) {
+        // Oops.
+        html += '<p>This node has no content!</p>';
+      } else {
+        // Fuse content into HTML template.
+        if(texts.length) {
+          html += texts.map(function(content) {
+            if(!content.title) {
+              content.title = "";
+            }
+              return article('<h2>' + content.title + '</h2>', content.text);
+          }).join('');
+        }
+        if(links.length) {
+          html += links.map(function(content) {
+            return article('<a href="' + content.link + '"><h2>' + content.title + '</h2></a>', content.description);
+          }).join('');
+        }
+
+        function article(header, content) {
+          return '<article><header>' + header + '</header><p>' + content + '</p></article>';
+        };
+      }
+
+      modal({
+        content: html,
+        closeButton: true,
+        width: 700,
+      });
+    });
+}
+
+function setupModals(kg) {
+  kg.onEvent('renderGraph', function(e) {
+    addNodeModalEvents.call(kg, e.graph, e.nodes);
+  });
+};
+
+module.exports = {
+  name: 'modals',
+  run: setupModals,
+};
+
+},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":3}]},{},[53])

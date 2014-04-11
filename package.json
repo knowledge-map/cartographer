@@ -18,16 +18,17 @@
 
   "dependencies": {
     "d3": "~3.3.8",
-    "dagre-d3": "git://github.com/knowledge-graph/dagre-d3.git#master"
+    "dagre-d3": "git://github.com/knowledge-graph/dagre-d3.git#master",
+    "PicoModal": "git://github.com/d3x7r0/PicoModal.git#master"
   },
 
   "scripts": {
     "git-setup": "tools/gitsetup",
     "build-js": "node tools/build.js",
-    "build-css": "catw -c 'lessc -' 'src/css/*.less' -o dist/css/knowledge-graph.css",
+    "build-css": "catw -c 'lessc --include-path=src/css -' 'src/css/*.less' -o dist/css/knowledge-graph.css",
     "build": "npm run build-js & npm run build-css",
     "watch-js": "watchify src/knowledge-graph.js -d -o dist/knowledge-graph.js",
-    "watch-css": "catw -c 'lessc -' 'src/css/*.less' -o dist/css/knowledge-graph.css -v",
+    "watch-css": "catw -c 'lessc --include-path=src/css -' 'src/css/*.less' -o dist/css/knowledge-graph.css -v",
     "watch": "npm run watch-css & npm run watch-js",
     "start": "npm run watch-css & beefy --live src/knowledge-graph.js:dist/knowledge-graph.js",
     "test": "npm run build-js & jshint src/knowledge-graph.js & karma start tests/karma.conf.js --single-run",
