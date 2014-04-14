@@ -47,5 +47,5 @@ var knowledge = {
 // Create graph that visualises the knowledge
 knowledgeGraph.create({
   graph: knowledge,
-  plugins: ['editing-modal'],
+  plugins: ['editing', 'editing-modals'],
 });
