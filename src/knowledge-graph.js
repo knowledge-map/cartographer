@@ -46,6 +46,10 @@ Offsets the in/out edges to above/below given nodes
 Replaces the default dagre-d3 PositionEdgePaths function
 */
 function positionEdgePaths(g, svgEdgePaths) {
+  // Add an ID to each edge
+  svgEdgePaths
+    .attr('id', function(d) { return d; });
+
   var interpolate = this._edgeInterpolate,
       tension = this._edgeTension;
 
@@ -107,20 +111,31 @@ Used in addition to the default node rendering function
 function drawHamburgers(graph, nodes) {
   var kg = this;
 
+  // Create a semi-circle path function
+  var semicircle = d3.svg.arc()
+    .outerRadius(20)
+    .startAngle(3*Math.PI/2)
+    .endAngle(5*Math.PI/2);
+
   // Add enter/above
-  var enter = nodes.insert('circle', 'rect')
+  var enter = nodes.insert('path', 'rect')
     .classed('enter', true)
-    .attr('r', 25)
-    .attr('cy', function() {
-      return -nodes.selectAll('rect').attr('height')/2;
+    .attr('d', semicircle)
+    .attr('transform', function() {
+      return 'translate(0,' + (-nodes.selectAll('rect').attr('height')/2) + ')';
     });
+
+  // Flip the semi-circle
+  semicircle
+    .startAngle(Math.PI/2)
+    .endAngle(3*Math.PI/2);
   
   // Add exit/below
-  var exit = nodes.insert('circle', 'rect')
+  var exit = nodes.insert('path', 'rect')
     .classed('exit', true)
-    .attr('r', 25)
-    .attr('cy', function() {
-      return nodes.selectAll('rect').attr('height')/2;
+    .attr('d', semicircle)
+    .attr('transform', function() {
+      return 'translate(0,' + (nodes.selectAll('rect').attr('height')/2) + ')';
     });
 }
 
@@ -157,9 +172,20 @@ var KnowledgeGraph = function(api, config) {
 
   // Add transitions for graph updates
   renderer.transition(function(selection) {
-    return selection
-      .transition()
-        .duration(500);
+    var duration;
+    if (config && config.transitionDuration !== undefined) {
+      duration = config.transitionDuration;
+    } else {
+      duration = 500;
+    }
+
+    if (duration) {
+      return selection
+        .transition()
+          .duration(duration);
+    } else {
+      return selection;
+    }
   });
 
   // Add enter/exit circles

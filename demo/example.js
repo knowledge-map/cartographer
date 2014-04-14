@@ -7,8 +7,7 @@ var knowledge = {
       id: "knowledge-map",
       name: "What is a knowledge map?",
       content: [{
-        description: "Knowledge maps are like a roadmap for pieces of knowledge. They can be used to show others how to navigate from their current set of knowledge to a particular goal. Or they can be used to find people who know something you haven't learnt yet.",
-        link: ""
+        text: "Knowledge maps are like a roadmap for pieces of knowledge. They can be used to show others how to navigate from their current set of knowledge to a particular goal. Or they can be used to find people who know something you haven't learnt yet.",
       }]
     },
     {
@@ -16,8 +15,7 @@ var knowledge = {
       name: "Viewing a knowledge map",
       dependencies: ["knowledge-map"],
       content: [{
-        description: "You're doing it right now! Each of the labelled points on the page is called a 'concept' and the arrows joining them are called 'dependencies'. Concepts are pieces of information that can be learned if you have learned all of the concepts which point to it. That is, if you want to learn a concept learn all of its dependencies!",
-        link: ""
+        text: "You're doing it right now! Each of the labelled points on the page is called a 'concept' and the arrows joining them are called 'dependencies'. Concepts are pieces of information that can be learned if you have learned all of the concepts which point to it. That is, if you want to learn a concept learn all of its dependencies!",
       }]
     },
     {
@@ -35,8 +33,7 @@ var knowledge = {
       name: "Sharing your own knowledge map",
       dependencies: ["creating"],
       content: [{
-        description: "Once you've created your own knowledge map you can share it in various ways. You can embed the knowledge map in your website or save it as an image.",
-        link: ""
+        text: "Once you've created your own knowledge map you can share it in various ways. You can embed the knowledge map in your website or save it as an image.",
       }]
     },
     {
@@ -44,8 +41,7 @@ var knowledge = {
       name: "Learning using knowledge maps",
       dependencies: ["viewing"],
       content: [{
-        description: "You can learn by using the resources attached to a concept or by contacting people who know the concept. The best knowledge maps will give you lots of different resources to try and learn each concept.",
-        link: ""
+        text: "You can learn by using the resources attached to a concept or by contacting people who know the concept. The best knowledge maps will give you lots of different resources to try and learn each concept.",
       }]
     }
   ]

@@ -1,0 +1,82 @@
+svg {
+  width: 100%;
+  height: 800px;
+}
+text {
+  font-family: 'Fira', sans-serif;
+  fill: #000000;
+  cursor: pointer;
+}
+.node .enter {
+  fill: #cccccc;
+}
+.node .exit {
+  fill: #cccccc;
+}
+.node rect {
+  fill: #ffffff;
+}
+.edgePath path {
+  fill: none;
+  stroke: #808080;
+  stroke-width: 2px;
+}
+#arrowhead {
+  fill: #808080 !important;
+}
+svg {
+  width: 100%;
+  height: 800px;
+}
+text {
+  font-family: 'Fira', sans-serif;
+  fill: #000000;
+  cursor: pointer;
+}
+.node .enter {
+  fill: #cccccc;
+}
+.node .exit {
+  fill: #cccccc;
+}
+.node rect {
+  fill: #ffffff;
+}
+.edgePath path {
+  fill: none;
+  stroke: #808080;
+  stroke-width: 2px;
+}
+#arrowhead {
+  fill: #808080 !important;
+}
+.pico-content {
+  font-family: 'Fira', sans-serif;
+}
+.pico-content > h1 {
+  font-size: 40px;
+  line-height: 52px;
+  margin-bottom: 40px;
+}
+.pico-content a {
+  font-weight: bold;
+  text-decoration: none;
+  color: #fa8072;
+}
+.pico-content a:visited {
+  color: #fcb5ad;
+}
+.pico-content a:hover {
+  text-decoration: underline;
+}
+.pico-content article {
+  color: #444444;
+}
+.pico-close {
+  height: auto !important;
+  width: auto !important;
+  padding: 5px;
+  font-size: 40px !important;
+  line-height: 20px !important;
+  background-color: transparent !important;
+}
