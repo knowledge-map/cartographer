@@ -352,6 +352,24 @@ var KnowledgeGraph = function(api, config) {
     });
   };
 
+  /*
+
+  Outputs the graph as a JSON object
+
+  */
+  this.toJSON = function() {
+    var json = {
+      concepts: [],
+    };
+
+    // Add all of the concepts
+    this.graph.eachNode(function(id, node) {
+      json.concepts.push(node.concept);
+    });
+
+    return JSON.stringify(json);
+  };
+
   // Initialise plugins for graph.
   if(config && config.plugins) {
     for(var i = 0; i < config.plugins.length; i++) {
