@@ -14120,11 +14120,11 @@ var modal = require('../node_modules/PicoModal/src/picoModal.js');
 
 function addNodeModalEvents(kg, graph, nodes) {
   nodes.select('text')
-    .on('click', function(conceptId) {
+    .on('click', function render(conceptId) {
       var concept = graph.node(conceptId).concept;
       var contents = concept.content;
       if(!contents || !contents.forEach) {
-        return;
+        concept.content = contents = [];
       }
       var title = concept.name;
       var texts = [];
@@ -14164,11 +14164,21 @@ function addNodeModalEvents(kg, graph, nodes) {
           return '<fieldset class="' + type + '">' + header + '<p>' + content + '</p></fieldset>';
         };
       }
+      html += '<button id="addContentBtn">Add Content</button>';
       html += '<input type="submit" id="saveBtn" value="Save" />';
 
       var editModal = modal({
         content: html,
         closeButton: true
+      });
+
+      d3.select('#addContentBtn').on('click', function() {
+        concept.content.push({
+          title: 'New Content',
+          text: 'New content text.',
+        });
+        editModal.close();
+        render(conceptId);
       });
 
       d3.select('#saveBtn').on('click', function() {
