@@ -52,6 +52,7 @@ function addNodeModalEvents(kg, graph, nodes) {
 
       var editModal = modal({
         content: html,
+        width: 700,
         closeButton: true
       });
 
