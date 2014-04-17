@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "repository": {
     "type": "git",
-    "url": "git://github.com/knowledge-graph/knowledge-graph.git"
+    "url": "https://github.com/knowledge-map/cartographer.git"
   },
 
   "devDependencies": {
