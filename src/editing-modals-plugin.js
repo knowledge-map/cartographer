@@ -48,7 +48,7 @@ function addNodeModalEvents(kg, graph, nodes) {
         };
       }
       html += '<button id="addContentBtn">Add Content</button>';
-      html += '<input type="submit" id="saveBtn" value="Save" />';
+      html += '<button id="saveBtn">Save</button>';
 
       var editModal = modal({
         content: html,

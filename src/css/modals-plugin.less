@@ -2,6 +2,10 @@
 
 @heading-size: 40px;
 
+@button-size: 30px;
+@button-padding: 6px;
+@button-color: #ccc;
+
 @close-size: 30px;
 @close-padding: 5px;
 
@@ -45,6 +49,27 @@
 
   textarea {
     min-height: 200px;
+  }
+
+  button {
+    font-family: 'Fira', sans-serif;
+    font-size: @button-size - @button-padding*2;
+
+    padding: @button-padding;
+
+    background: @button-color;
+    border: none;
+  }
+
+  button#saveBtn {
+    background: @highlight-color;
+  }
+
+  button:hover {
+    background: lighten(@button-color, 10%);
+  }
+  button#saveBtn:hover {
+    background: lighten(@highlight-color, 10%);
   }
 }
 
