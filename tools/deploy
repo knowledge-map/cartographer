@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# If we are on the master branch
+if [ 'git branch'="master" ]
+then
+  # Build CSS and JS
+  npm run build
+
+  # Commit the builds
+  git add dist
+  #git commit -m "Updating distribution files"
+  
+  # Update the version
+  # also update the git version tags
+  npm version patch
+
+  # Update the repo
+  git push
+
+  # Update the website
+  git add remote website https://github.com/knowledge-map/knowledge-map.github.io.git
+  git push website/master
+fi
