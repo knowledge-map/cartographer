@@ -14151,7 +14151,7 @@ function addNodeModalEvents(kg, graph, nodes) {
             if(!content.title) {
               content.title = "";
             }
-            return article('textContent', '<input type="text" value="' + content.title + '" />', '<textarea>' + content.text + '</textarea>');
+            return article('textContent', '<input class="title" type="text" value="' + content.title + '" />', '<textarea>' + content.text + '</textarea>');
           }).join('');
         }
         if(links.length) {
@@ -14161,14 +14161,15 @@ function addNodeModalEvents(kg, graph, nodes) {
         }
 
         function article(type, header, content) {
-          return '<fieldset class="' + type + '">' + header + '<p>' + content + '</p></fieldset>';
+          return '<article class="' + type + '">' + header + '<p>' + content + '</p></article>';
         };
       }
       html += '<button id="addContentBtn">Add Content</button>';
-      html += '<input type="submit" id="saveBtn" value="Save" />';
+      html += '<button id="saveBtn">Save</button>';
 
       var editModal = modal({
         content: html,
+        width: 700,
         closeButton: true
       });
 

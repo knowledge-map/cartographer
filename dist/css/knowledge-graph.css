@@ -53,10 +53,15 @@ text {
 .pico-content {
   font-family: 'Fira', sans-serif;
 }
-.pico-content > h1 {
+.pico-content > h1,
+.pico-content input#title {
   font-size: 40px;
   line-height: 52px;
   margin-bottom: 40px;
+}
+.pico-content h2,
+.pico-content input.title {
+  font-size: 28px;
 }
 .pico-content a {
   font-weight: bold;
@@ -71,6 +76,30 @@ text {
 }
 .pico-content article {
   color: #444444;
+}
+.pico-content input,
+.pico-content textarea {
+  font-family: 'Fira', sans-serif;
+  width: 95%;
+}
+.pico-content textarea {
+  min-height: 200px;
+}
+.pico-content button {
+  font-family: 'Fira', sans-serif;
+  font-size: 18px;
+  padding: 6px;
+  background: #cccccc;
+  border: none;
+}
+.pico-content button#saveBtn {
+  background: #fa8072;
+}
+.pico-content button:hover {
+  background: #e6e6e6;
+}
+.pico-content button#saveBtn:hover {
+  background: #fcaca3;
 }
 .pico-close {
   height: auto !important;
