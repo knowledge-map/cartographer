@@ -7,7 +7,7 @@ function addNodeModalEvents(kg, graph, nodes) {
       var concept = graph.node(conceptId).concept;
       var contents = concept.content;
       if(!contents || !contents.forEach) {
-        return;
+        contents = [];
       }
       var title = concept.name;
       var texts = [];
