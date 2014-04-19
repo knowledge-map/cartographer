@@ -6,6 +6,10 @@ then
   # Build CSS and JS
   npm run build
 
+  # 
+  git config user.email "travis@knowledge-map.org"
+  git config user.name "travis"
+
   # Commit the builds
   git add dist
   #git commit -m "Updating distribution files"
@@ -15,5 +19,5 @@ then
   npm version patch
 
   # Update the repo
-  git push
+  git push https://github.com/knowledge-map/cartographer.git
 fi
