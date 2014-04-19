@@ -1,7 +1,7 @@
-describe('Knowledge graph', function() {
+describe('Knowledge map', function() {
   var kg;
   beforeEach(function() {
-    kg = knowledgeGraph.create();
+    kg = knowledgeMap.create();
   });
 
   it('should have a method to create a concept', function() {
@@ -9,7 +9,7 @@ describe('Knowledge graph', function() {
   });
 });
 
-describe('Adding a concept to a knowledge graph', function() {
+describe('Adding a concept to a knowledge map', function() {
   var kg;
   var sampleConcept = {
     id: 'sample-concept',
@@ -17,7 +17,7 @@ describe('Adding a concept to a knowledge graph', function() {
   };
 
   beforeEach(function() {
-    kg = knowledgeGraph.create();
+    kg = knowledgeMap.create();
     kg.addConcept({concept: sampleConcept});
   });
 
@@ -31,7 +31,7 @@ describe('Adding a concept to a knowledge graph', function() {
   });
 });
 
-describe('Adding a dependency to a knowledge graph', function() {
+describe('Adding a dependency to a knowledge map', function() {
   var kg;
   var sampleConcept = {
     id: 'sample-concept',
@@ -48,7 +48,7 @@ describe('Adding a dependency to a knowledge graph', function() {
 
   beforeEach(function() {
     sampleConcept.dependencies = undefined;
-    kg = knowledgeGraph.create();
+    kg = knowledgeMap.create();
     kg.addConcept({concept: sampleConcept});
     kg.addConcept({concept: dependencyConcept});
     kg.addDependency({concept: sampleConcept, dependency: dependencyConcept.id});
@@ -65,7 +65,7 @@ describe('Adding a dependency to a knowledge graph', function() {
   });
 });
 
-describe('Removing a dependency from a knowledge graph', function() {
+describe('Removing a dependency from a knowledge map', function() {
   var kg;
   var sampleConcept = {
     id: 'sample-concept',
@@ -81,7 +81,7 @@ describe('Removing a dependency from a knowledge graph', function() {
   };
 
   beforeEach(function() {
-    kg = knowledgeGraph.create({
+    kg = knowledgeMap.create({
 	  transitionDuration: null,
 	});
     kg.addConcept({concept: sampleConcept});

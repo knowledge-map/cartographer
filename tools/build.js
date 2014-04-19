@@ -1,7 +1,7 @@
 var browserify = require('browserify'),
     fs = require('fs');
 
-var NAME = 'knowledge-graph';
+var NAME = 'knowledge-map';
 var SOURCE = './src/';
 var BUILD  = './dist/';
 var EXT = '.js';

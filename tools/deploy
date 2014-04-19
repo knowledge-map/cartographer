@@ -16,8 +16,4 @@ then
 
   # Update the repo
   git push
-
-  # Update the website
-  git add remote website https://github.com/knowledge-map/knowledge-map.github.io.git
-  git push website/master
 fi

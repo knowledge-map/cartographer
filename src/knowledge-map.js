@@ -141,7 +141,7 @@ function drawHamburgers(graph, nodes) {
 
 /*
 
-Construct a knowledge graph object.
+Construct a knowledge map object.
 
 Accepts a single object:
   config: an object that contains the data about the graph and various other
@@ -151,7 +151,7 @@ Accepts a single object:
     plugins: a list of plugin names or plugin objects
 
 */
-var KnowledgeGraph = function(api, config) {
+var KnowledgeMap = function(api, config) {
   // Create the directed graph
   var graph;
   if (config && config.graph) {
@@ -395,17 +395,17 @@ var KnowledgeGraph = function(api, config) {
 
 /*
 
-Public API for the knowledge-graph library
+Public API for the knowledge-map library
 
 */
 var api = {
   /*
 
-  Create a knowledge graph display that layouts out the entire graph.
+  Create a knowledge map display that layouts out the entire graph.
 
   */
   create: function(config) {
-    return new KnowledgeGraph(this, config);
+    return new KnowledgeMap(this, config);
   },
 
   plugins: {
@@ -422,5 +422,5 @@ var api = {
   }
 };
 
-global.knowledgeGraph = api; 
+global.knowledgeMap = api; 
 module.exports = api;

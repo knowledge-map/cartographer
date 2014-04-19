@@ -48,7 +48,7 @@ var knowledge = {
 };
 
 // Create graph that visualises the knowledge
-knowledgeGraph.create({
+knowledgeMap.create({
   graph: knowledge,
   plugins: ['modals'],
 });
