@@ -11,7 +11,7 @@ then
   git config user.name "travis"
 
   # Commit the builds
-  git add dist/*
+  git add dist/* -f
   NEW_DISTS=$?
   
   # If there are new distribution files
@@ -22,6 +22,6 @@ then
     npm version patch
 
     # Update the repo
-    git push https://github.com/knowledge-map/cartographer.git
+    git push --tags https://github.com/knowledge-map/cartographer.git
   fi
 fi
