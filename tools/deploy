@@ -19,12 +19,13 @@ then
   then
     # Commit the distributions
     git commit -am "Updated distribution files"
+    git clean -f
 
     # Update the version
     # also update the git version tags
     npm version patch
 
     # Update the repo
-    git push --tags https://github.com/knowledge-map/cartographer.git
+    git push --tags ssh://github.com/knowledge-map/cartographer.git
   fi
 fi
