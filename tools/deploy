@@ -26,6 +26,8 @@ then
     npm version patch
 
     # Update the repo
-    git push --tags ssh://github.com/knowledge-map/cartographer.git
+    git remote rm origin
+    git remote add origin https://kennib:${GH_TOKEN}@github.com/knowledge-map/cartographer.git
+    git push --tags
   fi
 fi
