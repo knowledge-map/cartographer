@@ -17,6 +17,9 @@ then
   # If there are new distribution files
   if [ $NEW_DISTS -eq 0 ]
   then
+    # Commit the distributions
+    git commit -m "Updated distribution files"
+
     # Update the version
     # also update the git version tags
     npm version patch
