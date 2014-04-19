@@ -18,7 +18,7 @@ then
   if [ $NEW_DISTS -eq 0 ]
   then
     # Commit the distributions
-    git commit -m "Updated distribution files"
+    git commit -am "Updated distribution files"
 
     # Update the version
     # also update the git version tags
