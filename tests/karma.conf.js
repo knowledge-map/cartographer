@@ -5,7 +5,7 @@ module.exports = function(config) {
     browsers: ['PhantomJS'],
 
     files: [
-      'dist/knowledge-graph.js',
+      'dist/knowledge-map.js',
       'tests/*.js'
     ],
   });

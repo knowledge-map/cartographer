@@ -12,4 +12,4 @@ var graph = {
 };
 
 // Create graph that visualises the knowledge
-knowledgeGraph.create({graph: graph});
+knowledgeMap.create({graph: graph});
