@@ -140,7 +140,7 @@ function drawHamburgers(graph, nodes) {
 }
 
 /*
-
+*
 Construct a knowledge map object.
 
 Accepts a single object:
@@ -353,9 +353,12 @@ var KnowledgeMap = function(api, config) {
   };
 
   /*
-
-  Outputs the graph as a JSON object
-
+  *
+  * Outputs the graph as a JSON string
+  *
+  * @class {KnowledgeMap}
+  * @method {toJSON}
+  * @return {String} a JSON string representing the knowledge map
   */
   this.toJSON = function() {
     var json = {
@@ -393,16 +396,20 @@ var KnowledgeMap = function(api, config) {
   return this;
 };
 
-/*
-
-Public API for the knowledge-map library
-
+/**
+*
+* Public API for the knowledge-map library
+*
+* @class {KnowledgeMapAPI}
 */
 var api = {
-  /*
-
-  Create a knowledge map display that layouts out the entire graph.
-
+  /**
+  * Create a knowledge map display that layouts out the entire graph.
+  *
+  * @class {KnowledgeMapAPI}
+  * @method {create}
+  * @param {object} Configuration object
+  * @return {KnowledgeMap} KnowledgeMap object
   */
   create: function(config) {
     return new KnowledgeMap(this, config);
