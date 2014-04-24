@@ -342,12 +342,6 @@ var KnowledgeMap = function(api, config) {
   this.render = function() {
     // Run the renderer
     this.renderer.run(this.graph, this.element);
-    
-    // Don't add another element for the zoom
-    this.renderer.zoomSetup(function(graph, element) {
-      this.element = element;
-      return element;
-    });
   };
 
   /*
