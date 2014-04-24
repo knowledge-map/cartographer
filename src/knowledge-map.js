@@ -152,16 +152,14 @@ Accepts a single object:
 
 */
 var KnowledgeMap = function(api, config) {
+  config = config || {};
+
   // Create the directed graph
-  var graph;
-  if (config && config.graph) {
-    graph = this.graph = createGraph(config.graph);
-  } else {
-    graph = this.graph = createGraph(); 
-  }
+  var graph = this.graph = createGraph(config.graph);
 
   // Create an element on the page for us to render our graph in
-  var element = this.element = d3.select('body').append('svg');
+  var parentName = config.inside || 'body';
+  var element = this.element = d3.select(parentName).append('svg');
 
   // Use dagre-d3 to render the graph
   var renderer = this.renderer = new dagreD3.Renderer();
