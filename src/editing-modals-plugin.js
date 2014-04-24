@@ -28,6 +28,10 @@ function addNodeModalEvents(kg, graph, nodes) {
         // Oops.
         html += '<p>This node has no content!</p>';
       } else {
+        function article(type, header, content) {
+          return '<article class="' + type + '">' + header + '<p>' + content + '</p></article>';
+        };
+
         // Fuse content into HTML template.
         if(texts.length) {
           html += texts.map(function(content) {
@@ -42,10 +46,6 @@ function addNodeModalEvents(kg, graph, nodes) {
             return article('linkContent', '<input type="url" value="' + content.link + '" /><input type="text" value="' + content.title + '" />', '<textarea>' + content.description + '</textarea>');
           }).join('');
         }
-
-        function article(type, header, content) {
-          return '<article class="' + type + '">' + header + '<p>' + content + '</p></article>';
-        };
       }
       html += '<button id="addContentBtn">Add Content</button>';
       html += '<button id="saveBtn">Save</button>';
