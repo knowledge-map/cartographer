@@ -53,7 +53,13 @@ function addNodeModalEvents(kg, graph, nodes) {
       var editModal = modal({
         content: html,
         width: 700,
-        closeButton: true
+        closeButton: true,
+        modalStyles: {
+          'overflow-y': 'scroll',
+          'max-height': '500px',
+          'background-color': 'white',
+          'padding': '20px'
+        }
       });
 
       d3.select('#addContentBtn').on('click', function() {
