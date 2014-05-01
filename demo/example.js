@@ -23,6 +23,12 @@ var knowledge = {
       name: "Create your own knowledge map",
       dependencies: ["knowledge-map", "viewing"],
       content: [{
+        text: "If you want to share how to do or learn something then create your own map! This concept links to an interactive demonstration that will allow you to create your own knowledge map.",
+      }, {
+        description: "If you want to share how to do or learn something then create your own map! This concept links to an interactive demonstration that will allow you to create your own knowledge map.",
+        title: "Graph editing demo",
+        link: "/demo/edit.html"
+      }, {
         description: "If you want to share how to do or learn something then create your own map! This concept links to an interactive demonstration that will allow you to create your own knowledge map.",
         title: "Graph editing demo",
         link: "/demo/edit.html"

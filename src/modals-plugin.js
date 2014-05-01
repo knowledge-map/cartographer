@@ -14,11 +14,17 @@ function addNodeModalEvents(graph, nodes) {
       var article = function(cls, header, content) {
         return '<article class="' + cls + '">' +
                   (header
-                    ? '<header><h2>' + header + '</h2></header>'
+                    ? '<header>' + header + '</header>'
                     : '') +
                   '<p>' + content + '</p>' +
                '</article>';
       };
+
+      var getHost = function(url) {
+        var a = document.createElement('a');
+        a.href = url;
+        return a.hostname;
+      }
 
       var html = '<h1>' + concept.name + '</h1>';
       if(!contents.length) {
@@ -28,10 +34,13 @@ function addNodeModalEvents(graph, nodes) {
         // Render each content item.
         contents.forEach(function(content) {
           if(content.link) {
-            var title = '<a href="' + content.link + '">' + content.title + '</a>';
+            var hostname = getHost(content.link);
+            var title = '<a href="' + content.link + '">' + content.title + '</a>' +
+                        '<span>(' + hostname + ')</span>';
             html += article('link', title, content.description);
           } else if(content.text) {
-            html += article('text', content.title, content.text);
+            var title = content.title ? '<h2>' + content.title + '</h2>' : null;
+            html += article('text', title, content.text);
           }
         });
       }
