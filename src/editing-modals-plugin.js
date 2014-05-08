@@ -42,34 +42,36 @@ function addNodeModalEvents(kg, graph, nodes) {
         .attr('id', 'title')
         .property('value', title);
 
+      var contentArea = modalElem.append('div').attr('class', 'content-area');
+
+      var article = function(type, content) {
+        var articleElem = contentArea.append('article')
+          .attr('class', type);
+        if(type == 'textContent') {
+          articleElem.append('input')
+            .attr('class', 'title')
+            .attr('type', 'text')
+            .property('value', content.title);
+        } else if(type == 'linkContent') {
+          articleElem.append('input')
+            .attr('type', 'url')
+            .property('value', content.link);
+          articleElem.append('input')
+            .attr('type', 'text')
+            .property('value', content.title);
+        }
+        var textarea = articleElem.append('p').append('textarea');
+        if(type == 'textContent') {
+          textarea.property('value', content.text);
+        } else if(type == 'linkContent') {
+          textarea.property('value', content.description);
+        }
+      };
+
       if(!texts.length && !links.length) {
         // Oops.
-        modalElem.append('p').text('This node has no content!');
+        contentArea.append('p').text('This node has no content!');
       } else {
-        function article(type, content) {
-          var article = modalElem.append('article')
-            .attr('class', type);
-          if(type == 'textContent') {
-            article.append('input')
-              .attr('class', 'title')
-              .attr('type', 'text')
-              .property('value', content.title);
-          } else if(type == 'linkContent') {
-            article.append('input')
-              .attr('type', 'url')
-              .property('value', content.link);
-            article.append('input')
-              .attr('type', 'text')
-              .property('value', content.title);
-          }
-          var textarea = article.append('p').append('textarea');
-          if(type == 'textContent') {
-            textarea.property('value', content.text);
-          } else if(type == 'linkContent') {
-            textarea.property('value', content.description);
-          }
-        };
-
         // Fuse content into HTML template.
         if(texts.length) {
           texts.forEach(function(content) {
@@ -130,12 +132,11 @@ function addNodeModalEvents(kg, graph, nodes) {
 
       d3.select('#addContentBtn').on('click', function() {
         saveContent();
-        concept.content.push({
-          title: 'New Content',
-          text: 'New content text.',
-        });
-        editModal.close();
-        render(conceptId);
+        article('textContent',
+          {
+            title: 'New Content Title',
+            text: 'New Content Text'
+          });
       });
 
       d3.select('#saveBtn').on('click', function() {
