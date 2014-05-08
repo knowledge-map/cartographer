@@ -23,49 +23,80 @@ function addNodeModalEvents(kg, graph, nodes) {
         }
       });
 
-      var html = '<input type="text" id="title" value="' + title + '" />';
+      var editModal = modal({
+        content: '',
+        width: 700,
+        closeButton: true,
+        modalStyles: {
+          'overflow-y': 'scroll',
+          'max-height': '500px',
+          'background-color': 'white',
+          'padding': '20px'
+        }
+      });
+
+      var modalElem = d3.select(editModal.modalElem);
+
+      modalElem.append('input')
+        .attr('type', 'text')
+        .attr('id', 'title')
+        .property('value', title);
+
+      var contentArea = modalElem.append('div').attr('class', 'content-area');
+
+      var article = function(type, content) {
+        var articleElem = contentArea.append('article')
+          .attr('class', type);
+        if(type == 'textContent') {
+          articleElem.append('input')
+            .attr('class', 'title')
+            .attr('type', 'text')
+            .property('value', content.title);
+        } else if(type == 'linkContent') {
+          articleElem.append('input')
+            .attr('type', 'url')
+            .property('value', content.link);
+          articleElem.append('input')
+            .attr('type', 'text')
+            .property('value', content.title);
+        }
+        var textarea = articleElem.append('p').append('textarea');
+        if(type == 'textContent') {
+          textarea.property('value', content.text);
+        } else if(type == 'linkContent') {
+          textarea.property('value', content.description);
+        }
+      };
+
       if(!texts.length && !links.length) {
         // Oops.
-        html += '<p>This node has no content!</p>';
+        contentArea.append('p').text('This node has no content!');
       } else {
-        function article(type, header, content) {
-          return '<article class="' + type + '">' + header + '<p>' + content + '</p></article>';
-        };
-
         // Fuse content into HTML template.
         if(texts.length) {
-          html += texts.map(function(content) {
+          texts.forEach(function(content) {
             if(!content.title) {
-              content.title = "";
+              content.title = '';
             }
-            return article('textContent', '<input class="title" type="text" value="' + content.title + '" />', '<textarea>' + content.text + '</textarea>');
-          }).join('');
+            article('textContent', content);
+          });
         }
         if(links.length) {
-          html += links.map(function(content) {
-            return article('linkContent', '<input type="url" value="' + content.link + '" /><input type="text" value="' + content.title + '" />', '<textarea>' + content.description + '</textarea>');
-          }).join('');
+          links.forEach(function(content) {
+            article('linkContent', content);
+          });
         }
       }
-      html += '<button id="addContentBtn">Add Content</button>';
-      html += '<button id="saveBtn">Save</button>';
 
-      var editModal = modal({
-        content: html,
-        width: 700,
-        closeButton: true
-      });
+      modalElem.append('button')
+        .attr('id', 'addContentBtn')
+        .text('Add Content');
 
-      d3.select('#addContentBtn').on('click', function() {
-        concept.content.push({
-          title: 'New Content',
-          text: 'New content text.',
-        });
-        editModal.close();
-        render(conceptId);
-      });
+      modalElem.append('button')
+        .attr('id', 'saveBtn')
+        .text('Save');
 
-      d3.select('#saveBtn').on('click', function() {
+      var saveContent = function() {
         // Update the value of whatever was changed in the modal into the graph.
         var newTitle = d3.select('#title').property('value');
         concept.name = newTitle;
@@ -97,11 +128,22 @@ function addNodeModalEvents(kg, graph, nodes) {
             description: contentDesc
           });
         });
+      };
 
+      d3.select('#addContentBtn').on('click', function() {
+        saveContent();
+        article('textContent',
+          {
+            title: 'New Content Title',
+            text: 'New Content Text'
+          });
+      });
+
+      d3.select('#saveBtn').on('click', function() {
+        saveContent();
         kg.render();
         editModal.close();
       });
-
     });
 }
 

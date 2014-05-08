@@ -9,44 +9,40 @@ function addNodeModalEvents(graph, nodes) {
       if(!contents || !contents.forEach) {
         return;
       }
-      var title = concept.name;
-      var texts = [];
-      var links = [];
 
-      // Collect different content types.
-      contents.forEach(function(content) {
-        if(content.link) {
-          links.push(content);
-        } else if(content.text) {
-          content.toString = function() { return this.text; };
-          texts.push(content);
-        }
-      });
+	    // Format a header and content into an <article> element.
+      var article = function(cls, header, content) {
+        return '<article class="' + cls + '">' +
+                  (header
+                    ? '<header>' + header + '</header>'
+                    : '') +
+                  '<p>' + content + '</p>' +
+               '</article>';
+      };
 
-      var html = '<h1>' + title + '</h1>';
-      if(!texts.length && !links.length) {
-        // Oops.
+      var getHost = function(url) {
+        var a = document.createElement('a');
+        a.href = url;
+        return a.hostname;
+      }
+
+      var html = '<h1>' + concept.name + '</h1>';
+      if(!contents.length) {
+        // Naww :(
         html += '<p>This node has no content!</p>';
       } else {
-	    // Function to generate an article with a header and content
-        function article(header, content) {
-          return '<article><header>' + header + '</header><p>' + content + '</p></article>';
-        };
-
-        // Fuse content into HTML template.
-        if(texts.length) {
-          html += texts.map(function(content) {
-            if(!content.title) {
-              content.title = "";
-            }
-              return article('<h2>' + content.title + '</h2>', content.text);
-          }).join('');
-        }
-        if(links.length) {
-          html += links.map(function(content) {
-            return article('<a href="' + content.link + '"><h2>' + content.title + '</h2></a>', content.description);
-          }).join('');
-        }
+        // Render each content item.
+        contents.forEach(function(content) {
+          if(content.link) {
+            var hostname = getHost(content.link);
+            var title = '<a href="' + content.link + '">' + content.title + '</a>' +
+                        '<span>(' + hostname + ')</span>';
+            html += article('link', title, content.description);
+          } else if(content.text) {
+            var title = content.title ? '<h2>' + content.title + '</h2>' : null;
+            html += article('text', title, content.text);
+          }
+        });
       }
 
       modal({
