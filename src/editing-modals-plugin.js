@@ -23,35 +23,8 @@ function addNodeModalEvents(kg, graph, nodes) {
         }
       });
 
-      var html = '<input type="text" id="title" value="' + title + '" />';
-      if(!texts.length && !links.length) {
-        // Oops.
-        html += '<p>This node has no content!</p>';
-      } else {
-        function article(type, header, content) {
-          return '<article class="' + type + '">' + header + '<p>' + content + '</p></article>';
-        };
-
-        // Fuse content into HTML template.
-        if(texts.length) {
-          html += texts.map(function(content) {
-            if(!content.title) {
-              content.title = "";
-            }
-            return article('textContent', '<input class="title" type="text" value="' + content.title + '" />', '<textarea>' + content.text + '</textarea>');
-          }).join('');
-        }
-        if(links.length) {
-          html += links.map(function(content) {
-            return article('linkContent', '<input type="url" value="' + content.link + '" /><input type="text" value="' + content.title + '" />', '<textarea>' + content.description + '</textarea>');
-          }).join('');
-        }
-      }
-      html += '<button id="addContentBtn">Add Content</button>';
-      html += '<button id="saveBtn">Save</button>';
-
       var editModal = modal({
-        content: html,
+        content: '',
         width: 700,
         closeButton: true,
         modalStyles: {
@@ -61,6 +34,65 @@ function addNodeModalEvents(kg, graph, nodes) {
           'padding': '20px'
         }
       });
+
+      var modalElem = d3.select(editModal.modalElem);
+
+      modalElem.append('input')
+        .attr('type', 'text')
+        .attr('id', 'title')
+        .property('value', title);
+
+      if(!texts.length && !links.length) {
+        // Oops.
+        modalElem.append('p').text('This node has no content!');
+      } else {
+        function article(type, content) {
+          var article = modalElem.append('article')
+            .attr('class', type);
+          if(type == 'textContent') {
+            article.append('input')
+              .attr('class', 'title')
+              .attr('type', 'text')
+              .property('value', content.title);
+          } else if(type == 'linkContent') {
+            article.append('input')
+              .attr('type', 'url')
+              .property('value', content.link);
+            article.append('input')
+              .attr('type', 'text')
+              .property('value', content.title);
+          }
+          var textarea = article.append('p').append('textarea');
+          if(type == 'textContent') {
+            textarea.property('value', content.text);
+          } else if(type == 'linkContent') {
+            textarea.property('value', content.description);
+          }
+        };
+
+        // Fuse content into HTML template.
+        if(texts.length) {
+          texts.forEach(function(content) {
+            if(!content.title) {
+              content.title = '';
+            }
+            article('textContent', content);
+          });
+        }
+        if(links.length) {
+          links.forEach(function(content) {
+            article('linkContent', content);
+          });
+        }
+      }
+
+      modalElem.append('button')
+        .attr('id', 'addContentBtn')
+        .text('Add Content');
+
+      modalElem.append('button')
+        .attr('id', 'saveBtn')
+        .text('Save');
 
       var saveContent = function() {
         // Update the value of whatever was changed in the modal into the graph.
