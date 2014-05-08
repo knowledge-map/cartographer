@@ -62,16 +62,7 @@ function addNodeModalEvents(kg, graph, nodes) {
         }
       });
 
-      d3.select('#addContentBtn').on('click', function() {
-        concept.content.push({
-          title: 'New Content',
-          text: 'New content text.',
-        });
-        editModal.close();
-        render(conceptId);
-      });
-
-      d3.select('#saveBtn').on('click', function() {
+      var saveContent = function() {
         // Update the value of whatever was changed in the modal into the graph.
         var newTitle = d3.select('#title').property('value');
         concept.name = newTitle;
@@ -103,11 +94,23 @@ function addNodeModalEvents(kg, graph, nodes) {
             description: contentDesc
           });
         });
+      };
 
+      d3.select('#addContentBtn').on('click', function() {
+        saveContent();
+        concept.content.push({
+          title: 'New Content',
+          text: 'New content text.',
+        });
+        editModal.close();
+        render(conceptId);
+      });
+
+      d3.select('#saveBtn').on('click', function() {
+        saveContent();
         kg.render();
         editModal.close();
       });
-
     });
 }
 
