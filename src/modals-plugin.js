@@ -10,46 +10,48 @@ function addNodeModalEvents(graph, nodes) {
         return;
       }
 
-	    // Format a header and content into an <article> element.
-      var article = function(cls, header, content) {
-        return '<article class="' + cls + '">' +
-                  (header
-                    ? '<header>' + header + '</header>'
-                    : '') +
-                  '<p>' + content + '</p>' +
-               '</article>';
-      };
-
       var getHost = function(url) {
         var a = document.createElement('a');
         a.href = url;
         return a.hostname;
       }
 
-      var html = '<h1>' + concept.name + '</h1>';
+      var editModal = modal({
+        content: '',
+        width: 700,
+        closeButton: true,
+      });
+
+      var modalElem = d3.select(editModal.modalElem)
+        .style('overflow-y', 'scroll')
+        .style('max-height', '500px')
+        .style('background-color', 'white')
+        .style('padding', '20px');
+
+      modalElem.append('h1').text(concept.name);
+
       if(!contents.length) {
         // Naww :(
-        html += '<p>This node has no content!</p>';
+        modalElem.append('p').text('This node has no content!');
       } else {
         // Render each content item.
         contents.forEach(function(content) {
           if(content.link) {
             var hostname = getHost(content.link);
-            var title = '<a href="' + content.link + '">' + content.title + '</a>' +
-                        '<span>(' + hostname + ')</span>';
-            html += article('link', title, content.description);
+            var article = modalElem.append('article').attr('class', 'link');
+            var header = article.append('header');
+            header.append('a').attr('href', content.link).text(content.title);
+            header.append('span').text(hostname);
+            article.append('p').html(content.description);
           } else if(content.text) {
-            var title = content.title ? '<h2>' + content.title + '</h2>' : null;
-            html += article('text', title, content.text);
+            var article = modalElem.append('article').attr('class', 'text');
+            if(content.title) {
+              article.append('h2').text(content.title);
+            }
+            article.append('p').html(content.text);
           }
         });
       }
-
-      modal({
-        content: html,
-        closeButton: true,
-        width: 700,
-      });
     });
 }
 

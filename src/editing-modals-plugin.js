@@ -27,15 +27,13 @@ function addNodeModalEvents(kg, graph, nodes) {
         content: '',
         width: 700,
         closeButton: true,
-        modalStyles: {
-          'overflow-y': 'scroll',
-          'max-height': '500px',
-          'background-color': 'white',
-          'padding': '20px'
-        }
       });
 
-      var modalElem = d3.select(editModal.modalElem);
+      var modalElem = d3.select(editModal.modalElem)
+        .style('overflow-y', 'scroll')
+        .style('max-height', '500px')
+        .style('background-color', 'white')
+        .style('padding', '20px');
 
       modalElem.append('input')
         .attr('type', 'text')
