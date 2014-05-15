@@ -149,10 +149,20 @@ function addConnectionEditing(graph, nodes) {
   return nodes;
 }
 
+function addEdgeDeleteButtons(graph, edges) {
+  var kg = this;
+  edges.select('path')
+    .style('cursor', 'pointer')
+    .on('click', function(depID) {
+      kg.removeDependency({dependency: depID});
+    });
+}
+
 function setupEditing(kg) {
   kg.onEvent('renderGraph', function(e) {
     addConnectionEditing.call(kg, e.graph, e.nodes);
     addChangeableLabels.call(kg, e.graph, e.nodes);
+    addEdgeDeleteButtons.call(kg, e.graph, e.edges);
   });
 };
 
