@@ -163,9 +163,12 @@ var KnowledgeMap = function(api, config) {
 
   // Use dagre-d3 to render the graph
   var renderer = this.renderer = new dagreD3.Renderer();
+  var layout   = this.layout   = dagreD3.layout()
+                                        .rankSep(100)
+                                        .rankDir(config.direction || 'TB');
 
   // Update the way edges are positioned
-  renderer.layout().rankSep(100);
+  renderer.layout(layout);
   renderer.positionEdgePaths(positionEdgePaths);
 
   // Add transitions for graph updates
