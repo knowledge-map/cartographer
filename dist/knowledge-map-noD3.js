@@ -5305,9 +5305,12 @@ var KnowledgeMap = function(api, config) {
 
   // Use dagre-d3 to render the graph
   var renderer = this.renderer = new dagreD3.Renderer();
-  var layout   = this.layout   = dagreD3.layout()
-                                        .rankSep(100)
-                                        .rankDir(config.direction || 'TB');
+  var layout   = this.layout   = dagreD3.layout().rankSep(50);
+  if (config.layout) {
+    if (config.layout.verticalSpace)   layout.rankSep(config.layout.verticalSpace);
+    if (config.layout.horizontalSpace) layout.nodeSep(config.layout.horizontalSpace);
+    if (config.layout.direction)       layout.rankDir(config.layout.direction);
+  }
 
   // Update the way edges are positioned
   renderer.layout(layout);
