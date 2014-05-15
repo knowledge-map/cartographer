@@ -15,6 +15,9 @@
 
 @modal-padding: 20px 35px;
 
+@success-color: chartreuse;
+@warning-color: salmon;
+
 .pico-content {
   font-family: 'Fira', sans-serif;
   padding:  @modal-padding !important;
@@ -83,14 +86,21 @@
   }
 
   button#saveBtn {
-    background: @highlight-color;
+    background: @success-color;
+  }
+
+  button#deleteConceptBtn {
+    background: @warning-color;
   }
 
   button:hover {
     background: lighten(@button-color, 10%);
   }
   button#saveBtn:hover {
-    background: lighten(@highlight-color, 10%);
+    background: lighten(@success-color, 10%);
+  }
+  button#deleteConceptBtn:hover {
+    background: lighten(@warning-color, 10%);
   }
 }
 

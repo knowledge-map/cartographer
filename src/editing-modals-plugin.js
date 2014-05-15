@@ -132,6 +132,10 @@ function addNodeModalEvents(kg, graph, nodes) {
         .attr('id', 'saveBtn')
         .text('Save');
 
+      modalElem.append('button')
+        .attr('id', 'deleteConceptBtn')
+        .text('Delete Concept');
+
       var saveContent = function() {
         // Update the value of whatever was changed in the modal into the graph.
         var newTitle = d3.select('#title').property('value');
@@ -177,6 +181,12 @@ function addNodeModalEvents(kg, graph, nodes) {
 
       d3.select('#saveBtn').on('click', function() {
         saveContent();
+        kg.render();
+        editModal.close();
+      });
+      
+      d3.select('#deleteConceptBtn').on('click', function() {
+        kg.graph.delNode(conceptId);
         kg.render();
         editModal.close();
       });
