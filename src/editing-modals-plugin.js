@@ -10,18 +10,8 @@ function addNodeModalEvents(kg, graph, nodes) {
         concept.content = contents = [];
       }
       var title = concept.name;
-      var texts = [];
-      var links = [];
-
-      // Collect different content types.
-      contents.forEach(function(content) {
-        if(content.link) {
-          links.push(content);
-        } else if(content.text) {
-          content.toString = function() { return this.text; };
-          texts.push(content);
-        }
-      });
+      // The IDs of the to-be-deleted content items before we actually delete them in saveContent()
+      var deleted = [];
 
       var editModal = modal({
         content: '',
@@ -42,9 +32,47 @@ function addNodeModalEvents(kg, graph, nodes) {
 
       var contentArea = modalElem.append('div').attr('class', 'content-area');
 
-      var article = function(type, content) {
+      // A function to create a new content item from a given JS object
+      var article = function(type, content, index) {
         var articleElem = contentArea.append('article')
-          .attr('class', type);
+          .attr('class', type)
+          .attr('id', index)
+          .style({
+            'border-color': '#cccccc',
+            'border-style': 'dashed',
+            'border-width': 'thin',
+            'padding-left': '13px',
+            'padding-right': '7px',
+            'margin-top': '10px',
+            'margin-bottom': '10px',
+          });
+        articleElem.append('div')
+          .text('×')
+          .attr('class', 'content-delete')
+          .style({
+            'cursor': 'pointer',
+            'position': 'relative',
+            'height': '20px',
+            'width': '20px',
+            'left': '98%',
+            'font-size': '25px',
+            'color': 'salmon',
+          })
+          .on('click', function() {
+            // If the content's x is clicked, temporarily hide the HTML and don't delete until saveContent()
+            var contentId = parseInt(this.parentNode.id);
+            // If we're removing a newly added element that hasn't been saved, just delete the node
+            // without worrying about the contents
+            if(!contentId && contentId != 0) {
+              this.parentNode.remove();
+            } else {
+              deleted.push(contentId);
+              this.parentNode.hidden = true;
+            }
+            if(countVisibleContent() == 0) {
+              d3.select('#no-content-msg').style('display', 'block');
+            }
+          });
         if(type == 'textContent') {
           articleElem.append('input')
             .attr('class', 'title')
@@ -52,11 +80,12 @@ function addNodeModalEvents(kg, graph, nodes) {
             .property('value', content.title);
         } else if(type == 'linkContent') {
           articleElem.append('input')
-            .attr('type', 'url')
-            .property('value', content.link);
-          articleElem.append('input')
+            .attr('class', 'title')
             .attr('type', 'text')
             .property('value', content.title);
+           articleElem.append('input')
+            .attr('type', 'url')
+            .property('value', content.link);
         }
         var textarea = articleElem.append('p').append('textarea');
         if(type == 'textContent') {
@@ -66,24 +95,33 @@ function addNodeModalEvents(kg, graph, nodes) {
         }
       };
 
-      if(!texts.length && !links.length) {
-        // Oops.
-        contentArea.append('p').text('This node has no content!');
-      } else {
-        // Fuse content into HTML template.
-        if(texts.length) {
-          texts.forEach(function(content) {
-            if(!content.title) {
-              content.title = '';
-            }
-            article('textContent', content);
-          });
+      var countVisibleContent = function() {
+        var count = 0;
+        for(var i=0; i<contentArea[0][0].children.length; i++) {
+          if(!contentArea[0][0].children[i].hidden) {
+            count++;
+          }
         }
-        if(links.length) {
-          links.forEach(function(content) {
-            article('linkContent', content);
-          });
+        return count;
+      }
+
+      modalElem.append('p')
+        .text("This concept has no content! Click 'Add Content' to add one.")
+        .attr('id', 'no-content-msg');
+
+      contents.forEach(function(content, index) {
+        if(content.link) {
+          article('linkContent', content, index);
+        } else if(content.text) {
+          if(!content.title) {
+            content.title = '';
+          }
+          article('textContent', content, index);
         }
+      });
+
+      if(countVisibleContent() != 0) {
+        d3.select('#no-content-msg').style('display', 'none');
       }
 
       modalElem.append('button')
@@ -99,37 +137,37 @@ function addNodeModalEvents(kg, graph, nodes) {
         var newTitle = d3.select('#title').property('value');
         concept.name = newTitle;
         graph.node(conceptId).label = newTitle;
-
-        var texts = d3.selectAll('.textContent')[0];
         concept.content = [];
-        texts.forEach(function(textContent) {
-          var childNodes = textContent.childNodes;
-          var contentTitle = d3.select(childNodes[0]).property('value');
-          var childTextNode = childNodes[1].childNodes;
-          var contentText = d3.select(childTextNode[0]).property('value');
-          concept.content.push({
-            title: contentTitle,
-            text: contentText
-          });
-        });
 
-        var links = d3.selectAll('.linkContent')[0];
-        links.forEach(function(linkContent) {
-          var childNodes = linkContent.childNodes;
-          var contentUrl = d3.select(childNodes[0]).property('value');
-          var contentTitle = d3.select(childNodes[1]).property('value');
-          var childTextNode = childNodes[2].childNodes;
-          var contentDesc = d3.select(childTextNode[0]).property('value');
-          concept.content.push({
-            title: contentTitle,
-            link: contentUrl,
-            description: contentDesc
-          });
+        d3.selectAll('article')[0].forEach(function(articleNode, index) {
+          if(deleted.indexOf(index) < 0) { // if this current index is not marked for deletion
+            if(articleNode.className == 'textContent') {
+              var childNodes = articleNode.childNodes;
+              var contentTitle = d3.select(childNodes[1]).property('value');
+              var childTextNode = childNodes[2].childNodes;
+              var contentText = d3.select(childTextNode[0]).property('value');
+              concept.content.push({
+                title: contentTitle,
+                text: contentText
+              });
+            } else if(articleNode.className == 'linkContent') {
+              var childNodes = articleNode.childNodes;
+              var contentUrl = d3.select(childNodes[1]).property('value');
+              var contentTitle = d3.select(childNodes[2]).property('value');
+              var childTextNode = childNodes[3].childNodes;
+              var contentDesc = d3.select(childTextNode[0]).property('value');
+              concept.content.push({
+                title: contentTitle,
+                link: contentUrl,
+                description: contentDesc
+              });
+            }
+          }
         });
       };
 
       d3.select('#addContentBtn').on('click', function() {
-        saveContent();
+        d3.select('#no-content-msg').style('display', 'none');
         article('textContent',
           {
             title: 'New Content Title',
