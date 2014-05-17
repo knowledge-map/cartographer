@@ -4817,6 +4817,122 @@ module.exports = '0.7.4';
 
 },{}],51:[function(require,module,exports){
 var d3 = require('d3');
+
+/*
+
+Adds entry and exit points for edges into concept elements
+
+Used in addition to the default node rendering function
+
+*/
+function drawHamburgers(graph, nodes) {
+  var kg = this;
+
+  // Create a semi-circle path function
+  var semicircle = d3.svg.arc()
+    .outerRadius(20)
+    .startAngle(3*Math.PI/2)
+    .endAngle(5*Math.PI/2);
+
+  // Add enter/above
+  var enter = nodes.insert('path', 'rect')
+    .classed('enter', true)
+    .attr('d', semicircle)
+    .attr('transform', function() {
+      return 'translate(0,' + (-nodes.selectAll('rect').attr('height')/2) + ')';
+    });
+
+  // Flip the semi-circle
+  semicircle
+    .startAngle(Math.PI/2)
+    .endAngle(3*Math.PI/2);
+  
+  // Add exit/below
+  var exit = nodes.insert('path', 'rect')
+    .classed('exit', true)
+    .attr('d', semicircle)
+    .attr('transform', function() {
+      return 'translate(0,' + (nodes.selectAll('rect').attr('height')/2) + ')';
+    });
+}
+
+/*
+
+Creates the points for the paths that make up the edges
+Offsets the in/out edges to above/below given nodes
+
+Replaces the default dagre-d3 PositionEdgePaths function
+*/
+function positionEdgePaths(g, svgEdgePaths) {
+  // Add an ID to each edge
+  svgEdgePaths
+    .attr('id', function(d) { return d; });
+
+  var interpolate = this._edgeInterpolate,
+      tension = this._edgeTension;
+
+  function calcPoints(e) {
+    var value = g.edge(e);
+    var source = g.node(g.incidentNodes(e)[0]);
+    var target = g.node(g.incidentNodes(e)[1]);
+    var points = value.points.slice();
+
+    var p0 = points.length === 0 ? target : points[0];
+    var p1 = points.length === 0 ? source : points[points.length - 1];
+
+    points.unshift(nodePosition(source, p0));
+    points.push(nodePosition(target, p1));
+
+    return d3.svg.line()
+      .x(function(d) { return d.x; })
+      .y(function(d) { return d.y; })
+      .interpolate(interpolate)
+      .tension(tension)
+      (points);
+  }
+
+  svgEdgePaths.filter('.enter').selectAll('path')
+      .attr('d', calcPoints);
+
+  this._transition(svgEdgePaths.selectAll('path'))
+      .attr('d', calcPoints)
+      .style('opacity', 1);
+}
+
+function nodePosition(node, point) {
+  var x = node.x;
+  var y = node.y;
+  var r = 25;
+  
+  var dx = point.x - x;
+  var dy = point.y - y;
+
+  // Length of the line from the circle to the point
+  var l = Math.sqrt(dx*dx + dy*dy);
+  // Unit values
+  var dxu = dx/l;
+  var dyu = dy/l;
+
+  // Offset above/below depending whether the line is up or down
+  var offset = ((dy > 0) ? 1 : -1) * node.height/4;
+
+  return {x: x + dxu*r, y: y + offset + dyu*r}; 
+}
+
+function setupBurgers(kg) {
+  kg.renderer.positionEdgePaths(positionEdgePaths);
+  kg.onEvent('renderGraph', function(e) {
+    drawHamburgers.call(kg, e.graph, e.nodes);
+  });
+};
+
+module.exports = {
+  name: 'default-appearance',
+  run: setupBurgers,
+};
+
+},{"d3":2}],52:[function(require,module,exports){
+var d3 = require('d3');
 var modal = require('../node_modules/PicoModal/src/picoModal.js');
 
 function addNodeModalEvents(kg, graph, nodes) {
@@ -4828,18 +4944,8 @@ function addNodeModalEvents(kg, graph, nodes) {
         concept.content = contents = [];
       }
       var title = concept.name;
-      var texts = [];
-      var links = [];
-
-      // Collect different content types.
-      contents.forEach(function(content) {
-        if(content.link) {
-          links.push(content);
-        } else if(content.text) {
-          content.toString = function() { return this.text; };
-          texts.push(content);
-        }
-      });
+      // The IDs of the to-be-deleted content items before we actually delete them in saveContent()
+      var deleted = [];
 
       var editModal = modal({
         content: '',
@@ -4860,9 +4966,47 @@ function addNodeModalEvents(kg, graph, nodes) {
 
       var contentArea = modalElem.append('div').attr('class', 'content-area');
 
-      var article = function(type, content) {
+      // A function to create a new content item from a given JS object
+      var article = function(type, content, index) {
         var articleElem = contentArea.append('article')
-          .attr('class', type);
+          .attr('class', type)
+          .attr('id', index)
+          .style({
+            'border-color': '#cccccc',
+            'border-style': 'dashed',
+            'border-width': 'thin',
+            'padding-left': '13px',
+            'padding-right': '7px',
+            'margin-top': '10px',
+            'margin-bottom': '10px',
+          });
+        articleElem.append('div')
+          .text('×')
+          .attr('class', 'content-delete')
+          .style({
+            'cursor': 'pointer',
+            'position': 'relative',
+            'height': '20px',
+            'width': '20px',
+            'left': '98%',
+            'font-size': '25px',
+            'color': 'salmon',
+          })
+          .on('click', function() {
+            // If the content's x is clicked, temporarily hide the HTML and don't delete until saveContent()
+            var contentId = parseInt(this.parentNode.id);
+            // If we're removing a newly added element that hasn't been saved, just delete the node
+            // without worrying about the contents
+            if(!contentId && contentId != 0) {
+              this.parentNode.remove();
+            } else {
+              deleted.push(contentId);
+              this.parentNode.hidden = true;
+            }
+            if(countVisibleContent() == 0) {
+              d3.select('#no-content-msg').style('display', 'block');
+            }
+          });
         if(type == 'textContent') {
           articleElem.append('input')
             .attr('class', 'title')
@@ -4870,11 +5014,12 @@ function addNodeModalEvents(kg, graph, nodes) {
             .property('value', content.title);
         } else if(type == 'linkContent') {
           articleElem.append('input')
-            .attr('type', 'url')
-            .property('value', content.link);
-          articleElem.append('input')
+            .attr('class', 'title')
             .attr('type', 'text')
             .property('value', content.title);
+           articleElem.append('input')
+            .attr('type', 'url')
+            .property('value', content.link);
         }
         var textarea = articleElem.append('p').append('textarea');
         if(type == 'textContent') {
@@ -4884,24 +5029,33 @@ function addNodeModalEvents(kg, graph, nodes) {
         }
       };
 
-      if(!texts.length && !links.length) {
-        // Oops.
-        contentArea.append('p').text('This node has no content!');
-      } else {
-        // Fuse content into HTML template.
-        if(texts.length) {
-          texts.forEach(function(content) {
-            if(!content.title) {
-              content.title = '';
-            }
-            article('textContent', content);
-          });
+      var countVisibleContent = function() {
+        var count = 0;
+        for(var i=0; i<contentArea[0][0].children.length; i++) {
+          if(!contentArea[0][0].children[i].hidden) {
+            count++;
+          }
         }
-        if(links.length) {
-          links.forEach(function(content) {
-            article('linkContent', content);
-          });
+        return count;
+      }
+
+      modalElem.append('p')
+        .text("This concept has no content! Click 'Add Content' to add one.")
+        .attr('id', 'no-content-msg');
+
+      contents.forEach(function(content, index) {
+        if(content.link) {
+          article('linkContent', content, index);
+        } else if(content.text) {
+          if(!content.title) {
+            content.title = '';
+          }
+          article('textContent', content, index);
         }
+      });
+
+      if(countVisibleContent() != 0) {
+        d3.select('#no-content-msg').style('display', 'none');
       }
 
       modalElem.append('button')
@@ -4912,42 +5066,46 @@ function addNodeModalEvents(kg, graph, nodes) {
         .attr('id', 'saveBtn')
         .text('Save');
 
+      modalElem.append('button')
+        .attr('id', 'deleteConceptBtn')
+        .text('Delete Concept');
+
       var saveContent = function() {
         // Update the value of whatever was changed in the modal into the graph.
         var newTitle = d3.select('#title').property('value');
         concept.name = newTitle;
         graph.node(conceptId).label = newTitle;
-
-        var texts = d3.selectAll('.textContent')[0];
         concept.content = [];
-        texts.forEach(function(textContent) {
-          var childNodes = textContent.childNodes;
-          var contentTitle = d3.select(childNodes[0]).property('value');
-          var childTextNode = childNodes[1].childNodes;
-          var contentText = d3.select(childTextNode[0]).property('value');
-          concept.content.push({
-            title: contentTitle,
-            text: contentText
-          });
-        });
 
-        var links = d3.selectAll('.linkContent')[0];
-        links.forEach(function(linkContent) {
-          var childNodes = linkContent.childNodes;
-          var contentUrl = d3.select(childNodes[0]).property('value');
-          var contentTitle = d3.select(childNodes[1]).property('value');
-          var childTextNode = childNodes[2].childNodes;
-          var contentDesc = d3.select(childTextNode[0]).property('value');
-          concept.content.push({
-            title: contentTitle,
-            link: contentUrl,
-            description: contentDesc
-          });
+        d3.selectAll('article')[0].forEach(function(articleNode, index) {
+          if(deleted.indexOf(index) < 0) { // if this current index is not marked for deletion
+            if(articleNode.className == 'textContent') {
+              var childNodes = articleNode.childNodes;
+              var contentTitle = d3.select(childNodes[1]).property('value');
+              var childTextNode = childNodes[2].childNodes;
+              var contentText = d3.select(childTextNode[0]).property('value');
+              concept.content.push({
+                title: contentTitle,
+                text: contentText
+              });
+            } else if(articleNode.className == 'linkContent') {
+              var childNodes = articleNode.childNodes;
+              var contentUrl = d3.select(childNodes[1]).property('value');
+              var contentTitle = d3.select(childNodes[2]).property('value');
+              var childTextNode = childNodes[3].childNodes;
+              var contentDesc = d3.select(childTextNode[0]).property('value');
+              concept.content.push({
+                title: contentTitle,
+                link: contentUrl,
+                description: contentDesc
+              });
+            }
+          }
         });
       };
 
       d3.select('#addContentBtn').on('click', function() {
-        saveContent();
+        d3.select('#no-content-msg').style('display', 'none');
         article('textContent',
           {
             title: 'New Content Title',
@@ -4957,6 +5115,12 @@ function addNodeModalEvents(kg, graph, nodes) {
 
       d3.select('#saveBtn').on('click', function() {
         saveContent();
+        kg.render();
+        editModal.close();
+      });
+      
+      d3.select('#deleteConceptBtn').on('click', function() {
+        kg.graph.delNode(conceptId);
         kg.render();
         editModal.close();
       });
@@ -4974,7 +5138,7 @@ module.exports = {
   run: setupModals,
 };
 
-},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":2}],52:[function(require,module,exports){
+},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":2}],53:[function(require,module,exports){
 var d3 = require('d3');
 
 /*
@@ -5138,7 +5302,7 @@ module.exports = {
   run: setupEditing
 };
 
-},{"d3":2}],53:[function(require,module,exports){
+},{"d3":2}],54:[function(require,module,exports){
 (function (global){
 "use strict";
 
@@ -5182,107 +5346,6 @@ var createGraph = function(json) {
 
 /*
 
-Creates the points for the paths that make up the edges
-Offsets the in/out edges to above/below given nodes
-
-Replaces the default dagre-d3 PositionEdgePaths function
-*/
-function positionEdgePaths(g, svgEdgePaths) {
-  // Add an ID to each edge
-  svgEdgePaths
-    .attr('id', function(d) { return d; });
-
-  var interpolate = this._edgeInterpolate,
-      tension = this._edgeTension;
-
-  function calcPoints(e) {
-    var value = g.edge(e);
-    var source = g.node(g.incidentNodes(e)[0]);
-    var target = g.node(g.incidentNodes(e)[1]);
-    var points = value.points.slice();
-
-    var p0 = points.length === 0 ? target : points[0];
-    var p1 = points.length === 0 ? source : points[points.length - 1];
-
-    points.unshift(nodePosition(source, p0));
-    points.push(nodePosition(target, p1));
-
-    return d3.svg.line()
-      .x(function(d) { return d.x; })
-      .y(function(d) { return d.y; })
-      .interpolate(interpolate)
-      .tension(tension)
-      (points);
-  }
-
-  svgEdgePaths.filter('.enter').selectAll('path')
-      .attr('d', calcPoints);
-
-  this._transition(svgEdgePaths.selectAll('path'))
-      .attr('d', calcPoints)
-      .style('opacity', 1);
-}
-
-function nodePosition(node, point) {
-  var x = node.x;
-  var y = node.y;
-  var r = 25;
-  
-  var dx = point.x - x;
-  var dy = point.y - y;
-
-  // Length of the line from the circle to the point
-  var l = Math.sqrt(dx*dx + dy*dy);
-  // Unit values
-  var dxu = dx/l;
-  var dyu = dy/l;
-
-  // Offset above/below depending whether the line is up or down
-  var offset = ((dy > 0) ? 1 : -1) * node.height/4;
-
-  return {x: x + dxu*r, y: y + offset + dyu*r}; 
-}
-
-/*
-
-Adds entry and exit points for edges into concept elements
-
-Used in addition to the default node rendering function
-
-*/
-function drawHamburgers(graph, nodes) {
-  var kg = this;
-
-  // Create a semi-circle path function
-  var semicircle = d3.svg.arc()
-    .outerRadius(20)
-    .startAngle(3*Math.PI/2)
-    .endAngle(5*Math.PI/2);
-
-  // Add enter/above
-  var enter = nodes.insert('path', 'rect')
-    .classed('enter', true)
-    .attr('d', semicircle)
-    .attr('transform', function() {
-      return 'translate(0,' + (-nodes.selectAll('rect').attr('height')/2) + ')';
-    });
-
-  // Flip the semi-circle
-  semicircle
-    .startAngle(Math.PI/2)
-    .endAngle(3*Math.PI/2);
-  
-  // Add exit/below
-  var exit = nodes.insert('path', 'rect')
-    .classed('exit', true)
-    .attr('d', semicircle)
-    .attr('transform', function() {
-      return 'translate(0,' + (nodes.selectAll('rect').attr('height')/2) + ')';
-    });
-}
-
-/*
-
 Construct a knowledge map object.
 
 Accepts a single object:
@@ -5314,7 +5377,6 @@ var KnowledgeMap = function(api, config) {
 
   // Update the way edges are positioned
   renderer.layout(layout);
-  renderer.positionEdgePaths(positionEdgePaths);
 
   // Add transitions for graph updates
   renderer.transition(function(selection) {
@@ -5342,9 +5404,6 @@ var KnowledgeMap = function(api, config) {
 
     // Add class labels
     nodes.attr('id', function(d) { return d; });
-
-    // Add burger buns
-    drawHamburgers.call(kg, graph, nodes);
 
     // Add interactivity
     kg.postEvent({
@@ -5511,13 +5570,13 @@ var KnowledgeMap = function(api, config) {
   };
 
   // Initialise plugins for graph.
-  if(config && config.plugins) {
-    for(var i = 0; i < config.plugins.length; i++) {
+  if (config.plugins) {
+    for (var i = 0; i < config.plugins.length; i++) {
       var plugin = config.plugins[i];
-      if('string' === typeof(plugin)) {
+      if ('string' === typeof(plugin)) {
         plugin = api.plugins[plugin];
       }
-      if(plugin && plugin.run) {
+      if (plugin && plugin.run) {
         plugin.run(this);
       }
     }
@@ -5549,6 +5608,7 @@ var api = {
   },
 
   plugins: {
+    'default-appearance': require('./burger-appearance-plugin.js'),
     'links': require('./links-plugin.js'),
     'editing': require('./editing-plugin.js'),
     'modals': require('./modals-plugin.js'),
@@ -5566,7 +5626,7 @@ global.knowledgeMap = api;
 module.exports = api;
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./editing-modals-plugin.js":51,"./editing-plugin.js":52,"./links-plugin.js":54,"./modals-plugin.js":55,"d3":2,"dagre-d3":3}],54:[function(require,module,exports){
+},{"./burger-appearance-plugin.js":51,"./editing-modals-plugin.js":52,"./editing-plugin.js":53,"./links-plugin.js":55,"./modals-plugin.js":56,"d3":2,"dagre-d3":3}],55:[function(require,module,exports){
 var d3 = require('d3');
 
 function addNodeLinks(graph, nodes) {
@@ -5605,7 +5665,7 @@ module.exports = {
   run: setupLinks,
 };
 
-},{"d3":2}],55:[function(require,module,exports){
+},{"d3":2}],56:[function(require,module,exports){
 var d3 = require('d3');
 var modal = require('../node_modules/PicoModal/src/picoModal.js');
 
@@ -5674,4 +5734,4 @@ module.exports = {
   run: setupModals,
 };
 
-},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":2}]},{},[53])
+},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":2}]},{},[54])
