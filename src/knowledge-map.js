@@ -411,6 +411,7 @@ var api = {
     'editing': require('./editing-plugin.js'),
     'modals': require('./modals-plugin.js'),
     'editing-modals': require('./editing-modals-plugin.js'),
+    'click-events': require('./click-events-plugin.js'),
   },
 
   registerPlugin: function(plugin) {
