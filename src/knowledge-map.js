@@ -147,6 +147,7 @@ Accepts a single object:
 */
 var KnowledgeMap = function(api, config) {
   config = config || {};
+  this.config = config;
 
   /*
   Message API
@@ -379,15 +380,16 @@ var KnowledgeMap = function(api, config) {
   });
 
   var postRender = renderer.postRender();
-  renderer.postRender(function(graph, root) {
-    var result = postRender(graph, root);
+  renderer.postRender(function(result, root) {
+    var res = postRender(result, root);
     kg.postEvent({
       type: 'renderGraph',
       graph: kg.graph,
+      result: result,
       nodes: _renderData.nodes,
       edges: _renderData.edges
     });
-    return result;
+    return res;
   });
 
   // Create the directed graph
