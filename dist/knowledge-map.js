@@ -14119,7 +14119,7 @@ function setupClickEvents(kg) {
       .on('click', function (conceptId) {
         kg.postEvent({
           type: 'clickConcept',
-          concept: kg.graph.node(conceptId)
+          concept: kg.graph.node(conceptId).concept
         });
       });
   });
