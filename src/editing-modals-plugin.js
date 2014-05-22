@@ -83,7 +83,7 @@ function addNodeModalEvents(kg, graph, nodes) {
             .attr('class', 'title')
             .attr('type', 'text')
             .property('value', content.title);
-           articleElem.append('input')
+          articleElem.append('input')
             .attr('type', 'url')
             .property('value', content.link);
         }
@@ -141,7 +141,6 @@ function addNodeModalEvents(kg, graph, nodes) {
         var newTitle = d3.select('#title').property('value');
         concept.name = newTitle;
         graph.node(conceptId).label = newTitle;
-        concept.content = [];
 
         d3.selectAll('article')[0].forEach(function(articleNode, index) {
           if(deleted.indexOf(index) < 0) { // if this current index is not marked for deletion
@@ -150,22 +149,28 @@ function addNodeModalEvents(kg, graph, nodes) {
               var contentTitle = d3.select(childNodes[1]).property('value');
               var childTextNode = childNodes[2].childNodes;
               var contentText = d3.select(childTextNode[0]).property('value');
-              concept.content.push({
-                title: contentTitle,
-                text: contentText
-              });
+              kg.updateContent(conceptId,
+                index,
+                {
+                  title: contentTitle,
+                  text: contentText
+                });
             } else if(articleNode.className == 'linkContent') {
               var childNodes = articleNode.childNodes;
               var contentUrl = d3.select(childNodes[1]).property('value');
               var contentTitle = d3.select(childNodes[2]).property('value');
               var childTextNode = childNodes[3].childNodes;
               var contentDesc = d3.select(childTextNode[0]).property('value');
-              concept.content.push({
-                title: contentTitle,
-                link: contentUrl,
-                description: contentDesc
-              });
+              kg.updateContent(conceptId,
+                index,
+                {
+                  title: contentTitle,
+                  link: contentUrl,
+                  description: contentDesc
+                });
             }
+          } else { // it is marked for deletion, so remove it from the graph
+            kg.removeContent(conceptId, index);
           }
         });
       };

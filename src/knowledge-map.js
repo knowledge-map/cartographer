@@ -367,6 +367,50 @@ var KnowledgeMap = function(api, config) {
 
     return JSON.stringify(json);
   };
+  
+  /*
+
+  Deletes a concept from the graph
+
+  */
+
+  this.removeConcept = function(conceptId) {
+
+  };
+
+  /*
+
+  Add a piece of content to a concept
+
+  */
+  this.addContent = function(conceptId, content) {
+    var concept = this.graph.node(conceptId).concept;
+    concept.content.push(content);
+  };
+
+  /*
+
+  Update a piece of content in a concept
+
+  */
+  this.updateContent = function(conceptId, contentIndex, content) {
+    var concept = this.graph.node(conceptId).concept;
+    if(contentIndex >= concept.content.length) {
+      this.addContent(conceptId, content);
+    } else {
+      concept.content[contentIndex] = content;
+    }
+  };
+
+  /*
+
+  Remove a piece of content from a concept
+
+  */
+  this.removeContent = function(conceptId, contentIndex) {
+    var concept = this.graph.node(conceptId).concept;
+    concept.content.splice(contentIndex, 1);
+  };
 
   // Initialise plugins for graph.
   if(config && config.plugins) {
