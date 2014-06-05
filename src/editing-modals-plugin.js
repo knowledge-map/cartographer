@@ -191,8 +191,7 @@ function addNodeModalEvents(kg, graph, nodes) {
       });
       
       d3.select('#deleteConceptBtn').on('click', function() {
-        kg.graph.delNode(conceptId);
-        kg.render();
+        kg.removeConcept(conceptId);
         editModal.close();
       });
     });

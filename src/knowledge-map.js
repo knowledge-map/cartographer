@@ -282,6 +282,7 @@ var KnowledgeMap = function(api, config) {
   config:
     concept: the concept which depends on another concept
     dependency: the id of the concept which is depended on
+
   */
   this.addDependency = function(config) {
     // Get ids of the concepts
@@ -373,9 +374,46 @@ var KnowledgeMap = function(api, config) {
   Deletes a concept from the graph
 
   */
-
   this.removeConcept = function(conceptId) {
+    var kg = this;
+    var concept = kg.graph.node(conceptId).concept;
 
+    // Remove all links to concepts that this one depends on
+    if(concept.dependencies) {
+      concept.dependencies.forEach(function(dependency) {
+        kg.removeDependency({
+          concept: conceptId,
+          dependency: dependency,
+        });
+      });
+    }
+
+    // Remove all links to concepts that depend on this
+    var dependants = kg.getDependants(conceptId);
+    if(dependants.length) {
+      dependants.forEach(function(dependant) {
+        kg.removeDependency({
+          concept: dependant,
+          dependency: conceptId,
+        });
+      });
+    }
+
+    // Remove the node
+    kg.graph.delNode(conceptId);
+
+    // Update the display
+    this.render();
+  };
+
+  /*
+
+  Return a list of IDs of concepts that depend on a given concept, i.e.
+  have this concept as a dependency
+
+  */
+  this.getDependants = function(conceptId) {
+    return this.graph.successors(conceptId);
   };
 
   /*
