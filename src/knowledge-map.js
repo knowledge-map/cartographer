@@ -141,7 +141,7 @@ function drawHamburgers(graph, nodes) {
 
 /*
 
-Construct a knowledge graph object.
+Construct a knowledge map object.
 
 Accepts a single object:
   config: an object that contains the data about the graph and various other
@@ -151,23 +151,27 @@ Accepts a single object:
     plugins: a list of plugin names or plugin objects
 
 */
-var KnowledgeGraph = function(api, config) {
+var KnowledgeMap = function(api, config) {
+  config = config || {};
+
   // Create the directed graph
-  var graph;
-  if (config && config.graph) {
-    graph = this.graph = createGraph(config.graph);
-  } else {
-    graph = this.graph = createGraph(); 
-  }
+  var graph = this.graph = createGraph(config.graph);
 
   // Create an element on the page for us to render our graph in
-  var element = this.element = d3.select('body').append('svg');
+  var parentName = config.inside || 'body';
+  var element = this.element = d3.select(parentName).append('svg');
 
   // Use dagre-d3 to render the graph
   var renderer = this.renderer = new dagreD3.Renderer();
+  var layout   = this.layout   = dagreD3.layout().rankSep(50);
+  if (config.layout) {
+    if (config.layout.verticalSpace)   layout.rankSep(config.layout.verticalSpace);
+    if (config.layout.horizontalSpace) layout.nodeSep(config.layout.horizontalSpace);
+    if (config.layout.direction)       layout.rankDir(config.layout.direction);
+  }
 
   // Update the way edges are positioned
-  renderer.layout().rankSep(100);
+  renderer.layout(layout);
   renderer.positionEdgePaths(positionEdgePaths);
 
   // Add transitions for graph updates
@@ -344,12 +348,6 @@ var KnowledgeGraph = function(api, config) {
   this.render = function() {
     // Run the renderer
     this.renderer.run(this.graph, this.element);
-    
-    // Don't add another element for the zoom
-    this.renderer.zoomSetup(function(graph, element) {
-      this.element = element;
-      return element;
-    });
   };
 
   /*
@@ -395,17 +393,17 @@ var KnowledgeGraph = function(api, config) {
 
 /*
 
-Public API for the knowledge-graph library
+Public API for the knowledge-map library
 
 */
 var api = {
   /*
 
-  Create a knowledge graph display that layouts out the entire graph.
+  Create a knowledge map display that layouts out the entire graph.
 
   */
   create: function(config) {
-    return new KnowledgeGraph(this, config);
+    return new KnowledgeMap(this, config);
   },
 
   plugins: {
@@ -413,6 +411,7 @@ var api = {
     'editing': require('./editing-plugin.js'),
     'modals': require('./modals-plugin.js'),
     'editing-modals': require('./editing-modals-plugin.js'),
+    'click-events': require('./click-events-plugin.js'),
   },
 
   registerPlugin: function(plugin) {
@@ -422,5 +421,5 @@ var api = {
   }
 };
 
-global.knowledgeGraph = api; 
+global.knowledgeMap = api; 
 module.exports = api;

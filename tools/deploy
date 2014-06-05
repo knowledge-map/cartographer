@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# If we are on the master branch
+if [ 'git branch'="master" ]
+then
+  # Build CSS and JS
+  npm run build
+
+  # Add travis identification
+  #git config user.email "travis@knowledge-map.org"
+  #git config user.name "travis"
+
+  # Add the changes to the distribution files
+  git checkout HEAD
+  git add dist/* -f
+  NEW_DISTS=$?
+  
+  # If there are changes to the distribution files
+  if [ $NEW_DISTS -eq 0 ]
+  then
+    # Commit the distributions
+    git commit -am "Updated distribution files"
+    git clean -f
+
+    # Update the version
+    # also update the git version tags
+    npm version patch
+
+    # Update the repo
+    #git remote rm origin
+    #git remote add origin https://kennib:${GH_TOKEN}@github.com/knowledge-map/cartographer.git
+    git push
+    git push --tags
+  fi
+fi

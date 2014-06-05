@@ -2,10 +2,10 @@ module.exports = function(config) {
   config.set({
     basePath: '..',
     frameworks: ['jasmine'],
-    browsers: ['PhantomJS'],
+    browsers: ['PhantomJS', 'Firefox'],
 
     files: [
-      'dist/knowledge-graph.js',
+      'dist/knowledge-map.js',
       'tests/*.js'
     ],
   });

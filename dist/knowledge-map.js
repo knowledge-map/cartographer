@@ -9904,32 +9904,30 @@ function defaultTransition(selection) {
 
 // Setup dom for zooming
 function defaultZoomSetup(graph, svg) {
-  // Create an overlay for capturing mouse events
-  svg.append('rect')
-    .attr('class', 'overlay')
-    .attr('width', '100%')
-    .attr('height', '100%')
-    .style('fill', 'none')
-    .style('pointer-events', 'all');
-  
-  // Capture the zoom behaviour from the svg
-  var zoom = d3.behavior.zoom();
-  svg = svg
-    .call(zoom)
-    .append('g');
+  if (svg.select('rect.overlay').empty()) {
+    // Create an overlay for capturing mouse events that don't touch foreground
+    svg.append('rect')
+      .attr('class', 'overlay')
+      .attr('width', '100%')
+      .attr('height', '100%')
+      .style('fill', 'none')
+      .style('pointer-events', 'all');
 
-  // On zoom apply the zoom method
-  zoom.on('zoom', this._zoom(graph, svg));
+    // Capture the zoom behaviour from the svg
+    containerSvg = svg;
+    svg = svg.append('g')
+      .attr('class', 'zoom');
+    containerSvg.call(this._zoom(graph, svg));
+  }
 
-  // New elements are added inside of the zoomable group
   return svg;
 }
 
 // By default allow pan and zoom
 function defaultZoom(graph, svg) {
-  return function() {
+  return d3.behavior.zoom().on('zoom', function() {
     svg.attr('transform', 'translate(' + d3.event.translate + ')scale(' + d3.event.scale + ')');
-  };
+  });
 }
 
 function defaultPostLayout() {
@@ -14115,99 +14113,216 @@ exports.values = function(o) {
 module.exports = '0.7.4';
 
 },{}],52:[function(require,module,exports){
+function setupClickEvents(kg) {
+  kg.onEvent('renderGraph', function(e) {
+    e.nodes.select('text')
+      .on('click', function (conceptId) {
+        kg.postEvent({
+          type: 'clickConcept',
+          concept: kg.graph.node(conceptId).concept
+        });
+      });
+  });
+};
+
+module.exports = {
+  name: 'click-events',
+  run: setupClickEvents
+};
+
+},{}],53:[function(require,module,exports){
 var d3 = require('d3');
 var modal = require('../node_modules/PicoModal/src/picoModal.js');
 
 function addNodeModalEvents(kg, graph, nodes) {
   nodes.select('text')
-    .on('click', function(conceptId) {
+    .on('click', function render(conceptId) {
       var concept = graph.node(conceptId).concept;
       var contents = concept.content;
       if(!contents || !contents.forEach) {
-        return;
+        concept.content = contents = [];
       }
       var title = concept.name;
-      var texts = [];
-      var links = [];
-
-      // Collect different content types.
-      contents.forEach(function(content) {
-        if(content.link) {
-          links.push(content);
-        } else if(content.text) {
-          content.toString = function() { return this.text; };
-          texts.push(content);
-        }
-      });
-
-      var html = '<input type="text" id="title" value="' + title + '" />';
-      if(!texts.length && !links.length) {
-        // Oops.
-        html += '<p>This node has no content!</p>';
-      } else {
-        // Fuse content into HTML template.
-        if(texts.length) {
-          html += texts.map(function(content) {
-            if(!content.title) {
-              content.title = "";
-            }
-            return article('textContent', '<input type="text" value="' + content.title + '" />', '<textarea>' + content.text + '</textarea>');
-          }).join('');
-        }
-        if(links.length) {
-          html += links.map(function(content) {
-            return article('linkContent', '<input type="url" value="' + content.link + '" /><input type="text" value="' + content.title + '" />', '<textarea>' + content.description + '</textarea>');
-          }).join('');
-        }
-
-        function article(type, header, content) {
-          return '<fieldset class="' + type + '">' + header + '<p>' + content + '</p></fieldset>';
-        };
-      }
-      html += '<input type="submit" id="saveBtn" value="Save" />';
+      // The IDs of the to-be-deleted content items before we actually delete them in saveContent()
+      var deleted = [];
 
       var editModal = modal({
-        content: html,
-        closeButton: true
+        content: '',
+        width: 700,
+        closeButton: true,
       });
 
-      d3.select('#saveBtn').on('click', function() {
+      var modalElem = d3.select(editModal.modalElem)
+        .style('overflow-y', 'scroll')
+        .style('max-height', '500px')
+        .style('background-color', 'white')
+        .style('padding', '20px');
+
+      modalElem.append('input')
+        .attr('type', 'text')
+        .attr('id', 'title')
+        .property('value', title);
+
+      var contentArea = modalElem.append('div').attr('class', 'content-area');
+
+      // A function to create a new content item from a given JS object
+      var article = function(type, content, index) {
+        var articleElem = contentArea.append('article')
+          .attr('class', type)
+          .attr('id', index)
+          .style({
+            'border-color': '#cccccc',
+            'border-style': 'dashed',
+            'border-width': 'thin',
+            'padding-left': '13px',
+            'padding-right': '7px',
+            'margin-top': '10px',
+            'margin-bottom': '10px',
+          });
+        articleElem.append('div')
+          .text('×')
+          .attr('class', 'content-delete')
+          .style({
+            'cursor': 'pointer',
+            'position': 'relative',
+            'height': '20px',
+            'width': '20px',
+            'left': '98%',
+            'font-size': '25px',
+            'color': 'salmon',
+          })
+          .on('click', function() {
+            // If the content's x is clicked, temporarily hide the HTML and don't delete until saveContent()
+            var contentId = parseInt(this.parentNode.id);
+            // If we're removing a newly added element that hasn't been saved, just delete the node
+            // without worrying about the contents
+            if(!contentId && contentId != 0) {
+              this.parentNode.remove();
+            } else {
+              deleted.push(contentId);
+              this.parentNode.hidden = true;
+            }
+            if(countVisibleContent() == 0) {
+              d3.select('#no-content-msg').style('display', 'block');
+            }
+          });
+        if(type == 'textContent') {
+          articleElem.append('input')
+            .attr('class', 'title')
+            .attr('type', 'text')
+            .property('value', content.title);
+        } else if(type == 'linkContent') {
+          articleElem.append('input')
+            .attr('class', 'title')
+            .attr('type', 'text')
+            .property('value', content.title);
+           articleElem.append('input')
+            .attr('type', 'url')
+            .property('value', content.link);
+        }
+        var textarea = articleElem.append('p').append('textarea');
+        if(type == 'textContent') {
+          textarea.property('value', content.text);
+        } else if(type == 'linkContent') {
+          textarea.property('value', content.description);
+        }
+      };
+
+      var countVisibleContent = function() {
+        var count = 0;
+        for(var i=0; i<contentArea[0][0].children.length; i++) {
+          if(!contentArea[0][0].children[i].hidden) {
+            count++;
+          }
+        }
+        return count;
+      }
+
+      modalElem.append('p')
+        .text("This concept has no content! Click 'Add Content' to add one.")
+        .attr('id', 'no-content-msg');
+
+      contents.forEach(function(content, index) {
+        if(content.link) {
+          article('linkContent', content, index);
+        } else if(content.text) {
+          if(!content.title) {
+            content.title = '';
+          }
+          article('textContent', content, index);
+        }
+      });
+
+      if(countVisibleContent() != 0) {
+        d3.select('#no-content-msg').style('display', 'none');
+      }
+
+      modalElem.append('button')
+        .attr('id', 'addContentBtn')
+        .text('Add Content');
+
+      modalElem.append('button')
+        .attr('id', 'saveBtn')
+        .text('Save');
+
+      modalElem.append('button')
+        .attr('id', 'deleteConceptBtn')
+        .text('Delete Concept');
+
+      var saveContent = function() {
         // Update the value of whatever was changed in the modal into the graph.
         var newTitle = d3.select('#title').property('value');
         concept.name = newTitle;
         graph.node(conceptId).label = newTitle;
-
-        var texts = d3.selectAll('.textContent')[0];
         concept.content = [];
-        texts.forEach(function(textContent) {
-          var childNodes = textContent.childNodes;
-          var contentTitle = d3.select(childNodes[0]).property('value');
-          var childTextNode = childNodes[1].childNodes;
-          var contentText = d3.select(childTextNode[0]).property('value');
-          concept.content.push({
-            title: contentTitle,
-            text: contentText
-          });
-        });
 
-        var links = d3.selectAll('.linkContent')[0];
-        links.forEach(function(linkContent) {
-          var childNodes = linkContent.childNodes;
-          var contentUrl = d3.select(childNodes[0]).property('value');
-          var contentTitle = d3.select(childNodes[1]).property('value');
-          var childTextNode = childNodes[2].childNodes;
-          var contentDesc = d3.select(childTextNode[0]).property('value');
-          concept.content.push({
-            title: contentTitle,
-            link: contentUrl,
-            description: contentDesc
-          });
+        d3.selectAll('article')[0].forEach(function(articleNode, index) {
+          if(deleted.indexOf(index) < 0) { // if this current index is not marked for deletion
+            if(articleNode.className == 'textContent') {
+              var childNodes = articleNode.childNodes;
+              var contentTitle = d3.select(childNodes[1]).property('value');
+              var childTextNode = childNodes[2].childNodes;
+              var contentText = d3.select(childTextNode[0]).property('value');
+              concept.content.push({
+                title: contentTitle,
+                text: contentText
+              });
+            } else if(articleNode.className == 'linkContent') {
+              var childNodes = articleNode.childNodes;
+              var contentUrl = d3.select(childNodes[1]).property('value');
+              var contentTitle = d3.select(childNodes[2]).property('value');
+              var childTextNode = childNodes[3].childNodes;
+              var contentDesc = d3.select(childTextNode[0]).property('value');
+              concept.content.push({
+                title: contentTitle,
+                link: contentUrl,
+                description: contentDesc
+              });
+            }
+          }
         });
+      };
 
+      d3.select('#addContentBtn').on('click', function() {
+        d3.select('#no-content-msg').style('display', 'none');
+        article('textContent',
+          {
+            title: 'New Content Title',
+            text: 'New Content Text'
+          });
+      });
+
+      d3.select('#saveBtn').on('click', function() {
+        saveContent();
         kg.render();
         editModal.close();
       });
-
+      
+      d3.select('#deleteConceptBtn').on('click', function() {
+        kg.graph.delNode(conceptId);
+        kg.render();
+        editModal.close();
+      });
     });
 }
 
@@ -14222,7 +14337,7 @@ module.exports = {
   run: setupModals,
 };
 
-},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":3}],53:[function(require,module,exports){
+},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":3}],54:[function(require,module,exports){
 var d3 = require('d3');
 
 /*
@@ -14386,7 +14501,7 @@ module.exports = {
   run: setupEditing
 };
 
-},{"d3":3}],54:[function(require,module,exports){
+},{"d3":3}],55:[function(require,module,exports){
 (function (global){
 "use strict";
 
@@ -14531,7 +14646,7 @@ function drawHamburgers(graph, nodes) {
 
 /*
 
-Construct a knowledge graph object.
+Construct a knowledge map object.
 
 Accepts a single object:
   config: an object that contains the data about the graph and various other
@@ -14541,23 +14656,27 @@ Accepts a single object:
     plugins: a list of plugin names or plugin objects
 
 */
-var KnowledgeGraph = function(api, config) {
+var KnowledgeMap = function(api, config) {
+  config = config || {};
+
   // Create the directed graph
-  var graph;
-  if (config && config.graph) {
-    graph = this.graph = createGraph(config.graph);
-  } else {
-    graph = this.graph = createGraph(); 
-  }
+  var graph = this.graph = createGraph(config.graph);
 
   // Create an element on the page for us to render our graph in
-  var element = this.element = d3.select('body').append('svg');
+  var parentName = config.inside || 'body';
+  var element = this.element = d3.select(parentName).append('svg');
 
   // Use dagre-d3 to render the graph
   var renderer = this.renderer = new dagreD3.Renderer();
+  var layout   = this.layout   = dagreD3.layout().rankSep(50);
+  if (config.layout) {
+    if (config.layout.verticalSpace)   layout.rankSep(config.layout.verticalSpace);
+    if (config.layout.horizontalSpace) layout.nodeSep(config.layout.horizontalSpace);
+    if (config.layout.direction)       layout.rankDir(config.layout.direction);
+  }
 
   // Update the way edges are positioned
-  renderer.layout().rankSep(100);
+  renderer.layout(layout);
   renderer.positionEdgePaths(positionEdgePaths);
 
   // Add transitions for graph updates
@@ -14734,12 +14853,6 @@ var KnowledgeGraph = function(api, config) {
   this.render = function() {
     // Run the renderer
     this.renderer.run(this.graph, this.element);
-    
-    // Don't add another element for the zoom
-    this.renderer.zoomSetup(function(graph, element) {
-      this.element = element;
-      return element;
-    });
   };
 
   /*
@@ -14785,17 +14898,17 @@ var KnowledgeGraph = function(api, config) {
 
 /*
 
-Public API for the knowledge-graph library
+Public API for the knowledge-map library
 
 */
 var api = {
   /*
 
-  Create a knowledge graph display that layouts out the entire graph.
+  Create a knowledge map display that layouts out the entire graph.
 
   */
   create: function(config) {
-    return new KnowledgeGraph(this, config);
+    return new KnowledgeMap(this, config);
   },
 
   plugins: {
@@ -14803,6 +14916,7 @@ var api = {
     'editing': require('./editing-plugin.js'),
     'modals': require('./modals-plugin.js'),
     'editing-modals': require('./editing-modals-plugin.js'),
+    'click-events': require('./click-events-plugin.js'),
   },
 
   registerPlugin: function(plugin) {
@@ -14812,11 +14926,11 @@ var api = {
   }
 };
 
-global.knowledgeGraph = api; 
+global.knowledgeMap = api; 
 module.exports = api;
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./editing-modals-plugin.js":52,"./editing-plugin.js":53,"./links-plugin.js":55,"./modals-plugin.js":56,"d3":3,"dagre-d3":4}],55:[function(require,module,exports){
+},{"./click-events-plugin.js":52,"./editing-modals-plugin.js":53,"./editing-plugin.js":54,"./links-plugin.js":56,"./modals-plugin.js":57,"d3":3,"dagre-d3":4}],56:[function(require,module,exports){
 var d3 = require('d3');
 
 function addNodeLinks(graph, nodes) {
@@ -14855,7 +14969,7 @@ module.exports = {
   run: setupLinks,
 };
 
-},{"d3":3}],56:[function(require,module,exports){
+},{"d3":3}],57:[function(require,module,exports){
 var d3 = require('d3');
 var modal = require('../node_modules/PicoModal/src/picoModal.js');
 
@@ -14867,51 +14981,49 @@ function addNodeModalEvents(graph, nodes) {
       if(!contents || !contents.forEach) {
         return;
       }
-      var title = concept.name;
-      var texts = [];
-      var links = [];
 
-      // Collect different content types.
-      contents.forEach(function(content) {
-        if(content.link) {
-          links.push(content);
-        } else if(content.text) {
-          content.toString = function() { return this.text; };
-          texts.push(content);
-        }
-      });
-
-      var html = '<h1>' + title + '</h1>';
-      if(!texts.length && !links.length) {
-        // Oops.
-        html += '<p>This node has no content!</p>';
-      } else {
-	    // Function to generate an article with a header and content
-        function article(header, content) {
-          return '<article><header>' + header + '</header><p>' + content + '</p></article>';
-        };
-
-        // Fuse content into HTML template.
-        if(texts.length) {
-          html += texts.map(function(content) {
-            if(!content.title) {
-              content.title = "";
-            }
-              return article('<h2>' + content.title + '</h2>', content.text);
-          }).join('');
-        }
-        if(links.length) {
-          html += links.map(function(content) {
-            return article('<a href="' + content.link + '"><h2>' + content.title + '</h2></a>', content.description);
-          }).join('');
-        }
+      var getHost = function(url) {
+        var a = document.createElement('a');
+        a.href = url;
+        return a.hostname;
       }
 
-      modal({
-        content: html,
-        closeButton: true,
+      var editModal = modal({
+        content: '',
         width: 700,
+        closeButton: true,
       });
+
+      var modalElem = d3.select(editModal.modalElem)
+        .style('overflow-y', 'scroll')
+        .style('max-height', '500px')
+        .style('background-color', 'white')
+        .style('padding', '20px');
+
+      modalElem.append('h1').text(concept.name);
+
+      if(!contents.length) {
+        // Naww :(
+        modalElem.append('p').text('This node has no content!');
+      } else {
+        // Render each content item.
+        contents.forEach(function(content) {
+          if(content.link) {
+            var hostname = getHost(content.link);
+            var article = modalElem.append('article').attr('class', 'link');
+            var header = article.append('header');
+            header.append('a').attr('href', content.link).text(content.title);
+            header.append('span').text(hostname);
+            article.append('p').html(content.description);
+          } else if(content.text) {
+            var article = modalElem.append('article').attr('class', 'text');
+            if(content.title) {
+              article.append('h2').text(content.title);
+            }
+            article.append('p').html(content.text);
+          }
+        });
+      }
     });
 }
 
@@ -14926,4 +15038,4 @@ module.exports = {
   run: setupModals,
 };
 
-},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":3}]},{},[54])
+},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":3}]},{},[55])

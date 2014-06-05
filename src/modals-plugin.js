@@ -9,51 +9,49 @@ function addNodeModalEvents(graph, nodes) {
       if(!contents || !contents.forEach) {
         return;
       }
-      var title = concept.name;
-      var texts = [];
-      var links = [];
 
-      // Collect different content types.
-      contents.forEach(function(content) {
-        if(content.link) {
-          links.push(content);
-        } else if(content.text) {
-          content.toString = function() { return this.text; };
-          texts.push(content);
-        }
-      });
-
-      var html = '<h1>' + title + '</h1>';
-      if(!texts.length && !links.length) {
-        // Oops.
-        html += '<p>This node has no content!</p>';
-      } else {
-	    // Function to generate an article with a header and content
-        function article(header, content) {
-          return '<article><header>' + header + '</header><p>' + content + '</p></article>';
-        };
-
-        // Fuse content into HTML template.
-        if(texts.length) {
-          html += texts.map(function(content) {
-            if(!content.title) {
-              content.title = "";
-            }
-              return article('<h2>' + content.title + '</h2>', content.text);
-          }).join('');
-        }
-        if(links.length) {
-          html += links.map(function(content) {
-            return article('<a href="' + content.link + '"><h2>' + content.title + '</h2></a>', content.description);
-          }).join('');
-        }
+      var getHost = function(url) {
+        var a = document.createElement('a');
+        a.href = url;
+        return a.hostname;
       }
 
-      modal({
-        content: html,
-        closeButton: true,
+      var editModal = modal({
+        content: '',
         width: 700,
+        closeButton: true,
       });
+
+      var modalElem = d3.select(editModal.modalElem)
+        .style('overflow-y', 'scroll')
+        .style('max-height', '500px')
+        .style('background-color', 'white')
+        .style('padding', '20px');
+
+      modalElem.append('h1').text(concept.name);
+
+      if(!contents.length) {
+        // Naww :(
+        modalElem.append('p').text('This node has no content!');
+      } else {
+        // Render each content item.
+        contents.forEach(function(content) {
+          if(content.link) {
+            var hostname = getHost(content.link);
+            var article = modalElem.append('article').attr('class', 'link');
+            var header = article.append('header');
+            header.append('a').attr('href', content.link).text(content.title);
+            header.append('span').text(hostname);
+            article.append('p').html(content.description);
+          } else if(content.text) {
+            var article = modalElem.append('article').attr('class', 'text');
+            if(content.title) {
+              article.append('h2').text(content.title);
+            }
+            article.append('p').html(content.text);
+          }
+        });
+      }
     });
 }
 
