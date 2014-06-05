@@ -16,10 +16,11 @@ svg {
 text {
   font-family: 'Fira', sans-serif;
   fill: @label-text-color;
-  cursor: pointer;
 }
 
 .node {
+  cursor: pointer;
+
   .enter {
     fill: @color;
   }
@@ -30,6 +31,17 @@ text {
 
   rect {
     fill: @label-color;
+  }
+}
+
+.node:hover {
+  .enter,
+  .exit {
+    fill: @highlight-color;
+  }
+
+  text {
+    fill: @highlight-color;
   }
 }
 
