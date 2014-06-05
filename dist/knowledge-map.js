@@ -9589,8 +9589,6 @@ function Renderer() {
   this.positionNodes(defaultPositionNodes);
   this.positionEdgeLabels(defaultPositionEdgeLabels);
   this.positionEdgePaths(defaultPositionEdgePaths);
-  this.zoomSetup(defaultZoomSetup);
-  this.zoom(defaultZoom);
   this.transition(defaultTransition);
   this.postLayout(defaultPostLayout);
   this.postRender(defaultPostRender);
@@ -9647,18 +9645,6 @@ Renderer.prototype.transition = function(transition) {
   return this;
 };
 
-Renderer.prototype.zoomSetup = function(zoomSetup) {
-  if (!arguments.length) { return this._zoomSetup; }
-  this._zoomSetup = bind(zoomSetup, this);
-  return this;
-};
-
-Renderer.prototype.zoom = function(zoom) {
-  if (!arguments.length) { return this._zoom; }
-  this._zoom = bind(zoom, this);
-  return this;
-};
-
 Renderer.prototype.postLayout = function(postLayout) {
   if (!arguments.length) { return this._postLayout; }
   this._postLayout = bind(postLayout, this);
@@ -9688,9 +9674,6 @@ Renderer.prototype.run = function(graph, svg) {
   // process.
   graph = copyAndInitGraph(graph);
 
-  // Create zoom elements
-  svg = this._zoomSetup(graph, svg);
-
   // Create layers
   svg
     .selectAll('g.edgePaths, g.edgeLabels, g.nodes')
@@ -9698,6 +9681,7 @@ Renderer.prototype.run = function(graph, svg) {
     .enter()
       .append('g')
       .attr('class', function(d) { return d; });
+
 
   // Create node and edge roots, attach labels, and capture dimension
   // information for use with layout.
@@ -9900,34 +9884,6 @@ function defaultPositionEdgePaths(g, svgEdgePaths) {
 // By default we do not use transitions
 function defaultTransition(selection) {
   return selection;
-}
-
-// Setup dom for zooming
-function defaultZoomSetup(graph, svg) {
-  if (svg.select('rect.overlay').empty()) {
-    // Create an overlay for capturing mouse events that don't touch foreground
-    svg.append('rect')
-      .attr('class', 'overlay')
-      .attr('width', '100%')
-      .attr('height', '100%')
-      .style('fill', 'none')
-      .style('pointer-events', 'all');
-
-    // Capture the zoom behaviour from the svg
-    containerSvg = svg;
-    svg = svg.append('g')
-      .attr('class', 'zoom');
-    containerSvg.call(this._zoom(graph, svg));
-  }
-
-  return svg;
-}
-
-// By default allow pan and zoom
-function defaultZoom(graph, svg) {
-  return d3.behavior.zoom().on('zoom', function() {
-    svg.attr('transform', 'translate(' + d3.event.translate + ')scale(' + d3.event.scale + ')');
-  });
 }
 
 function defaultPostLayout() {
@@ -14974,7 +14930,7 @@ var d3 = require('d3');
 var modal = require('../node_modules/PicoModal/src/picoModal.js');
 
 function addNodeModalEvents(graph, nodes) {
-  nodes.select('text')
+  nodes
     .on('click', function(conceptId) {
       var concept = graph.node(conceptId).concept;
       var contents = concept.content;
