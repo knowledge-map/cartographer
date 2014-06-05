@@ -14974,7 +14974,7 @@ var d3 = require('d3');
 var modal = require('../node_modules/PicoModal/src/picoModal.js');
 
 function addNodeModalEvents(graph, nodes) {
-  nodes.select('text')
+  nodes
     .on('click', function(conceptId) {
       var concept = graph.node(conceptId).concept;
       var contents = concept.content;

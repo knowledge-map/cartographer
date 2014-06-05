@@ -5,6 +5,8 @@ svg {
 text {
   font-family: 'Fira', sans-serif;
   fill: #000000;
+}
+.node {
   cursor: pointer;
 }
 .node .enter {
@@ -15,6 +17,13 @@ text {
 }
 .node rect {
   fill: #ffffff;
+}
+.node:hover .enter,
+.node:hover .exit {
+  fill: #fa8072;
+}
+.node:hover text {
+  fill: #fa8072;
 }
 .edgePath path {
   fill: none;
@@ -31,6 +40,8 @@ svg {
 text {
   font-family: 'Fira', sans-serif;
   fill: #000000;
+}
+.node {
   cursor: pointer;
 }
 .node .enter {
@@ -41,6 +52,13 @@ text {
 }
 .node rect {
   fill: #ffffff;
+}
+.node:hover .enter,
+.node:hover .exit {
+  fill: #fa8072;
+}
+.node:hover text {
+  fill: #fa8072;
 }
 .edgePath path {
   fill: none;
@@ -106,12 +124,18 @@ text {
   border: none;
 }
 .pico-content button#saveBtn {
+  background: #7fff00;
+}
+.pico-content button#deleteConceptBtn {
   background: #fa8072;
 }
 .pico-content button:hover {
   background: #e6e6e6;
 }
 .pico-content button#saveBtn:hover {
+  background: #99ff33;
+}
+.pico-content button#deleteConceptBtn:hover {
   background: #fcaca3;
 }
 .pico-close {
