@@ -31,6 +31,38 @@ describe('Adding a concept to a knowledge map', function() {
   });
 });
 
+describe('Removing a concept from a knowledge map', function() {
+  var kg;
+  var sampleConcept1 = {
+    id: 'sample-concept1',
+    name: 'sample-concept1',
+  };
+  var sampleConcept2 = {
+    id: 'sample-concept2',
+    name: 'sample-concept2',
+  };
+
+  beforeEach(function() {
+    kg = knowledgeMap.create();
+    kg.addConcept({concept: sampleConcept1});
+    kg.addConcept({concept: sampleConcept2});
+    waits(500); // Removing this makes the second test fail (DOM element not deleted properly)
+    kg.removeConcept(sampleConcept1.id);
+  });
+
+  it('remove the correct node from the knowledge map', function() {
+    expect(kg.graph.hasNode(sampleConcept1.id)).toBe(false);
+    expect(kg.graph.hasNode(sampleConcept2.id)).toBe(true);
+  });
+
+  it('remove the correct node from the display', function() {
+    var node1 = kg.element.select('.node#'+sampleConcept1.id).node();
+    expect(node1).toBe(null);
+    var node2 = kg.element.select('.node#'+sampleConcept2.id).node();
+    expect(node2).not.toBe(null);
+  });
+});
+
 describe('Adding a dependency to a knowledge map', function() {
   var kg;
   var sampleConcept = {
