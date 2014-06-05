@@ -423,7 +423,11 @@ var KnowledgeMap = function(api, config) {
   */
   this.addContent = function(conceptId, content) {
     var concept = this.graph.node(conceptId).concept;
-    concept.content.push(content);
+    if(concept.content) {
+      concept.content.push(content);
+    } else {
+      concept.content = [content];
+    }
   };
 
   /*
