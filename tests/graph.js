@@ -46,7 +46,7 @@ describe('Removing a concept from a knowledge map', function() {
     kg = knowledgeMap.create();
     kg.addConcept({concept: sampleConcept1});
     kg.addConcept({concept: sampleConcept2});
-    waits(500); // Removing this makes the second test fail (DOM element not deleted properly)
+    waits(1000); // Removing this makes the second test fail (DOM element not deleted properly)
     kg.removeConcept(sampleConcept1.id);
   });
 
