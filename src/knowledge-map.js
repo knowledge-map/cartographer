@@ -282,6 +282,7 @@ var KnowledgeMap = function(api, config) {
   config:
     concept: the concept which depends on another concept
     dependency: the id of the concept which is depended on
+
   */
   this.addDependency = function(config) {
     // Get ids of the concepts
@@ -366,6 +367,91 @@ var KnowledgeMap = function(api, config) {
     });
 
     return JSON.stringify(json);
+  };
+  
+  /*
+
+  Deletes a concept from the graph
+
+  */
+  this.removeConcept = function(conceptId) {
+    var kg = this;
+    var concept = kg.graph.node(conceptId).concept;
+
+    // Remove all links to concepts that this one depends on
+    if(concept.dependencies) {
+      concept.dependencies.forEach(function(dependency) {
+        kg.removeDependency({
+          concept: conceptId,
+          dependency: dependency,
+        });
+      });
+    }
+
+    // Remove all links to concepts that depend on this
+    var dependants = kg.getDependants(conceptId);
+    if(dependants.length) {
+      dependants.forEach(function(dependant) {
+        kg.removeDependency({
+          concept: dependant,
+          dependency: conceptId,
+        });
+      });
+    }
+
+    // Remove the node
+    kg.graph.delNode(conceptId);
+
+    // Update the display
+    this.render();
+  };
+
+  /*
+
+  Return a list of IDs of concepts that depend on a given concept, i.e.
+  have this concept as a dependency
+
+  */
+  this.getDependants = function(conceptId) {
+    return this.graph.successors(conceptId);
+  };
+
+  /*
+
+  Add a piece of content to a concept
+
+  */
+  this.addContent = function(conceptId, content) {
+    var concept = this.graph.node(conceptId).concept;
+    if(concept.content) {
+      concept.content.push(content);
+    } else {
+      concept.content = [content];
+    }
+  };
+
+  /*
+
+  Update a piece of content in a concept
+
+  */
+  this.updateContent = function(conceptId, contentIndex, content) {
+    var concept = this.graph.node(conceptId).concept;
+    if(contentIndex >= concept.content.length) {
+      this.addContent(conceptId, content);
+    } else {
+      concept.content[contentIndex] = content;
+    }
+  };
+
+  /*
+
+  Remove a piece of content from a concept
+
+  */
+  this.removeContent = function(conceptId, contentIndex) {
+    var concept = this.graph.node(conceptId).concept;
+    concept.content.splice(contentIndex, 1);
   };
 
   // Initialise plugins for graph.
