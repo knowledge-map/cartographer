@@ -18,7 +18,8 @@
   "dependencies": {
     "d3": "~3.3.8",
     "dagre-d3": "git://github.com/knowledge-map/dagre-d3.git#knowledge-map",
-    "PicoModal": "git://github.com/d3x7r0/PicoModal.git#master"
+    "PicoModal": "git://github.com/d3x7r0/PicoModal.git#master",
+    "markdown": "~0.5.0"
   },
   "scripts": {
     "git-setup": "tools/gitsetup",

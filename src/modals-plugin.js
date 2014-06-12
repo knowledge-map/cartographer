@@ -1,5 +1,6 @@
 var d3 = require('d3');
 var modal = require('../node_modules/PicoModal/src/picoModal.js');
+var markdown = require('markdown').markdown;
 
 function addNodeModalEvents(graph, nodes) {
   nodes
@@ -42,13 +43,13 @@ function addNodeModalEvents(graph, nodes) {
             var header = article.append('header');
             header.append('a').attr('href', content.link).text(content.title);
             header.append('span').text(hostname);
-            article.append('p').html(content.description);
+            article.append('p').html(markdown.toHTML(content.description));
           } else if(content.text) {
             var article = modalElem.append('article').attr('class', 'text');
             if(content.title) {
               article.append('h2').text(content.title);
             }
-            article.append('p').html(content.text);
+            article.append('p').html(markdown.toHTML(content.text));
           }
         });
       }
