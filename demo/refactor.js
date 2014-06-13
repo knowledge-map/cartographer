@@ -1,6 +1,6 @@
 var d3 = require('d3');
 var dagre = require('dagre');
-var grid = require('./node_modules/grid-d3/src/grid-d3.js');
+var grid = require('../node_modules/grid-d3/src/grid-d3.js');
 
 window.onload = function() {
   var g = new dagre.Digraph();
