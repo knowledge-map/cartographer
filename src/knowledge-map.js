@@ -1,45 +1,32 @@
 "use strict";
 
-var dagreD3 = require('dagre-d3');
 var d3 = require('d3');
+var dagre = require('dagre');
+var grid = require('../node_modules/grid-d3/src/grid-d3.js');
 
 /*
-
 Given a JSON object with the knowledge data, create a graph object which
 will be rendered by dagre-d3.
 
 json: TODO describe what the json should look like
-
 */
 var createGraph = function(json) {
-  var graph = new dagreD3.Digraph();
+  var self = this;
+  this.hold();
 
   if (json && json.concepts) {
     // Add all the concepts as nodes
     json.concepts.forEach(function(concept) {
-      graph.addNode(concept.id, {
-       label: concept.name,
-       concept: concept,
+      self.addConcept({
+        concept: concept
       });
-    });
-    // Check each concept for dependencies and add them as edges
-    json.concepts.forEach(function(concept) {
-      if (Array.isArray(concept.dependencies)) {
-        concept.dependencies.forEach(function(dep) {
-          // Add an edge from the dependency to the concept with a null edge ID
-          graph.addEdge(dep+'-'+concept.id, dep, concept.id);
-        });
-      } else {
-        // Dependencies is undefine/not an array and we'll figure out what to do with it later
-      }
     });
   }
 
-  return graph;
+  return this.unhold();
 };
 
 /*
-
 Creates the points for the paths that make up the edges
 Offsets the in/out edges to above/below given nodes
 
@@ -102,11 +89,8 @@ function nodePosition(node, point) {
 }
 
 /*
-
 Adds entry and exit points for edges into concept elements
-
 Used in addition to the default node rendering function
-
 */
 function drawHamburgers(graph, nodes) {
   var kg = this;
@@ -140,7 +124,6 @@ function drawHamburgers(graph, nodes) {
 }
 
 /*
-
 Construct a knowledge map object.
 
 Accepts a single object:
@@ -149,70 +132,9 @@ Accepts a single object:
   The available options are:
     graph: a JSON object that contains the graph data
     plugins: a list of plugin names or plugin objects
-
 */
 var KnowledgeMap = function(api, config) {
   config = config || {};
-
-  // Create the directed graph
-  var graph = this.graph = createGraph(config.graph);
-
-  // Create an element on the page for us to render our graph in
-  var parentName = config.inside || 'body';
-  var element = this.element = d3.select(parentName).append('svg');
-
-  // Use dagre-d3 to render the graph
-  var renderer = this.renderer = new dagreD3.Renderer();
-  var layout   = this.layout   = dagreD3.layout().rankSep(50);
-  if (config.layout) {
-    if (config.layout.verticalSpace)   layout.rankSep(config.layout.verticalSpace);
-    if (config.layout.horizontalSpace) layout.nodeSep(config.layout.horizontalSpace);
-    if (config.layout.direction)       layout.rankDir(config.layout.direction);
-  }
-
-  // Update the way edges are positioned
-  renderer.layout(layout);
-  renderer.positionEdgePaths(positionEdgePaths);
-
-  // Add transitions for graph updates
-  renderer.transition(function(selection) {
-    var duration;
-    if (config && config.transitionDuration !== undefined) {
-      duration = config.transitionDuration;
-    } else {
-      duration = 500;
-    }
-
-    if (duration) {
-      return selection
-        .transition()
-          .duration(duration);
-    } else {
-      return selection;
-    }
-  });
-
-  // Add enter/exit circles
-  var kg = this;
-  var drawNodes = renderer.drawNodes();
-  renderer.drawNodes(function(graph, element) {
-    var nodes = drawNodes(graph, element);
-
-    // Add class labels
-    nodes.attr('id', function(d) { return d; });
-
-    // Add burger buns
-    drawHamburgers.call(kg, graph, nodes);
-
-    // Add interactivity
-    kg.postEvent({
-      type: 'renderGraph',
-      graph: graph,
-      nodes: nodes
-    });
-
-    return nodes;
-  });
 
   /*
   Message API
@@ -236,6 +158,14 @@ var KnowledgeMap = function(api, config) {
   };
 
   /*
+  Hold API
+  */
+  var held    = (!!config.held) ? true : false;
+  this.hold   = function() { held = true; return this; }
+  this.unhold = function() { held = false; return this; }
+  this.held   = function() { return held; }
+
+  /*
   Adds a concept to the graph and then updates the graph rendering
 
   config:
@@ -249,17 +179,8 @@ var KnowledgeMap = function(api, config) {
     this.graph.addNode(config.concept.id, {
       label: config.concept.name,
       concept: config.concept,
+      width: 50, height: 20,
     });
-
-    // Add dependent edges to the graph
-    if (config.dependents) {
-      config.dependents.forEach(function(dep) {
-        kg.addDependency({
-          concept: kg.graph.node(dep).concept,
-          dependency: config.concept.id,
-        });
-      });
-    }
 
     // Add dependency edges to the graph
     if (config.concept.dependencies) {
@@ -272,17 +193,17 @@ var KnowledgeMap = function(api, config) {
     }
 
     // Update the graph display
-    this.render();
+    if(!this.held()) {
+      this.render();
+    }
   };
 
   /*
-
   Adds a dependency to the graph and then updates the graph rendering
 
   config:
     concept: the concept which depends on another concept
     dependency: the id of the concept which is depended on
-
   */
   this.addDependency = function(config) {
     // Get ids of the concepts
@@ -300,13 +221,13 @@ var KnowledgeMap = function(api, config) {
     this.graph.addEdge(dep+'-'+concept.id, dep, concept.id);
 
     // Update the graph display
-    this.render();
+    if(!this.held()) {
+      this.render();
+    }
   };
 
   /*
-
   Removes a dependency from the graph and then updates the graph rendering
-
   */
   this.removeDependency = function(config) {
     // Get ids of concepts
@@ -324,13 +245,13 @@ var KnowledgeMap = function(api, config) {
     this.graph.delEdge(dep+'-'+con);
 
     // Update the graph display
-    this.render();
+    if(!this.held()) {
+      this.render();
+    }
   };
 
   /*
-  
   Returns true if the graph has this dependency and false otherwise
-
   */
   this.hasDependency = function(config) {
     // Get ids of concepts
@@ -342,19 +263,42 @@ var KnowledgeMap = function(api, config) {
   };
 
   /*
-
   Renders/rerenders the graph elements
-
   */
   this.render = function() {
-    // Run the renderer
-    this.renderer.run(this.graph, this.element);
+    this.provideLayout(dagre.layout().run(this.graph));
   };
 
   /*
+  Give the graph a layout to be rendered.
+  */
+  this.provideLayout = function(layout) {
+    this.layout = layout;
+    var self = this;
 
+    var nodes = [layout.nodes().map(function(id) {
+      return {
+        id: id,
+        value: self.graph.node(id),
+        layout: layout.node(id)
+      };
+    })];
+    grid.render2D(nodes, this.asNodes);
+
+    var edges = [layout.edges().map(function(id) {
+      return {
+        id: id,
+        u: layout.node(layout._edges[id].u),
+        v: layout.node(layout._edges[id].v),
+        value: self.graph.edge(id),
+        layout: layout.edge(id)
+      };
+    })];
+    grid.render2D(edges, this.asEdges);
+  };
+
+  /*
   Outputs the graph as a JSON object
-
   */
   this.toJSON = function() {
     var json = {
@@ -370,9 +314,7 @@ var KnowledgeMap = function(api, config) {
   };
   
   /*
-
   Deletes a concept from the graph
-
   */
   this.removeConcept = function(conceptId) {
     var kg = this;
@@ -403,23 +345,21 @@ var KnowledgeMap = function(api, config) {
     kg.graph.delNode(conceptId);
 
     // Update the display
-    this.render();
+    if(!this.held()) {
+      this.render();
+    }
   };
 
   /*
-
   Return a list of IDs of concepts that depend on a given concept, i.e.
   have this concept as a dependency
-
   */
   this.getDependants = function(conceptId) {
     return this.graph.successors(conceptId);
   };
 
   /*
-
   Add a piece of content to a concept
-
   */
   this.addContent = function(conceptId, content) {
     var concept = this.graph.node(conceptId).concept;
@@ -431,9 +371,7 @@ var KnowledgeMap = function(api, config) {
   };
 
   /*
-
   Update a piece of content in a concept
-
   */
   this.updateContent = function(conceptId, contentIndex, content) {
     var concept = this.graph.node(conceptId).concept;
@@ -445,14 +383,95 @@ var KnowledgeMap = function(api, config) {
   };
 
   /*
-
   Remove a piece of content from a concept
-
   */
   this.removeContent = function(conceptId, contentIndex) {
     var concept = this.graph.node(conceptId).concept;
     concept.content.splice(contentIndex, 1);
   };
+
+  // Create the directed graph
+  this.graph = new dagre.Digraph();
+  createGraph.call(this, config.graph);
+
+  // Create an element on the page for us to render our graph in
+  var parentName = config.inside || 'body';
+  this.element = d3.select(parentName).append('svg').append('g');
+  this.edgeContainer = this.element.append('g').classed('edges', true);
+  this.nodeContainer = this.element.append('g').classed('nodes', true);
+
+  // Rendering stuff
+  var AsNodes = function(config) {
+    config = config || {};
+    grid.GridBase.call(this);
+
+    this.cellKey = function(d) { return d.id; };
+
+    this.makeRow = config.makeRow || function(e) {
+      return e.append('g');
+    };
+
+    this.makeColumn = config.makeColumn || function(e) {
+      return e.append('g');
+    };
+
+    this.onCells(this.defaultOnCells = function(cells) {
+      cells.select('circle')
+        .transition()
+        .attr('cx', function(d) { return d.layout.x; })
+        .attr('cy', function(d) { return d.layout.y; });
+      cells.select('text')
+        .transition()
+        .attr('x', function(d) { return d.layout.x; })
+        .attr('y', function(d) { return d.layout.y; });
+    });
+
+    this.onNewCells(this.defaultOnNewCells = function(cells) {
+      cells.append('circle')
+        .attr('r', 10);
+      cells.append('text')
+        .attr('text-anchor', 'middle');
+    });
+  };
+
+  var AsEdges = function(config) {
+    config = config || {};
+    grid.GridBase.call(this);
+
+    this.makeRow = config.makeRow || function(e) {
+      return e.append('g');
+    };
+
+    this.makeColumn = config.makeColumn || function(e) {
+      return e.append('g');
+    };
+  };
+
+  this.asNodes = new AsNodes()
+    .into(this.nodeContainer)
+    .onCells(function(cells) {
+      cells.select('text')
+        .text(function(d) { return d.value.label.split(' ').shift(); })
+        .attr('fill', 'red');
+    })
+    .onNewCells(function(cells) {
+      //cells.style('opacity', 0).transition().style('opacity', 1);
+    });
+
+  this.asEdges = new AsEdges()
+    .into(this.edgeContainer)
+    .onCells(function(cells) {
+      cells.select('line')
+        .attr('x1', function(d) { return d.u.x; })
+        .attr('y1', function(d) { return d.u.y; })
+        .attr('x2', function(d) { return d.v.x; })
+        .attr('y2', function(d) { return d.v.y; });
+    })
+    .onNewCells(function(cells) {
+      cells.append('line')
+        .attr('stroke-width', 2)
+        .attr('stroke', 'black');
+    });
 
   // Initialise plugins for graph.
   if(config && config.plugins) {
@@ -472,33 +491,28 @@ var KnowledgeMap = function(api, config) {
   }
 
   // Display the graph
-  this.render();
+  if(!this.held()) {
+    this.render();
+  }
 
   return this;
 };
 
 /*
-
 Public API for the knowledge-map library
-
 */
 var api = {
+  d3: d3,
+  dagre: dagre,
+
   /*
-
   Create a knowledge map display that layouts out the entire graph.
-
   */
   create: function(config) {
     return new KnowledgeMap(this, config);
   },
 
-  plugins: {
-    'links': require('./links-plugin.js'),
-    'editing': require('./editing-plugin.js'),
-    'modals': require('./modals-plugin.js'),
-    'editing-modals': require('./editing-modals-plugin.js'),
-    'click-events': require('./click-events-plugin.js'),
-  },
+  plugins: {},
 
   registerPlugin: function(plugin) {
     if(plugin && plugin.name && plugin.run) {
