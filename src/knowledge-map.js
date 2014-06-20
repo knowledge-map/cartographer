@@ -3,34 +3,42 @@
 var d3 = require('d3');
 var dagre = require('dagre');
 
+function callback(name) {
+  this.callbacks[name] = [];
+  var capName = name[0].toUpperCase() + name.slice(1);
+  this['do' + capName] = function(data) {
+    this.callbacks[name].forEach(function(cb) { cb(data); });
+  };
+  this['on' + capName] = function(cb) {
+    this.callbacks[name].push(cb);
+    return this;
+  };
+  this['off' + capName] = function(cb) {
+    var idx = this.callbacks[name].indexOf(cb);
+    if(-1 !== idx) {
+      this.callbacks[name].splice(idx, 1);
+    }
+    return this;
+  };
+}
+
+function property(store, access) {
+  this[store] = undefined;
+  this[access] = function(val) {
+    if(undefined === val) {
+      return this[store];
+    } else {
+      this[store] = val;
+      return this;
+    }
+  };
+}
+
 var Renderer = function() {
   this.callbacks = {};
 
-  function callback(name) {
-    this.callbacks[name] = [];
-    this['do' + name[0].toUpperCase() + name.slice(1)] = function(data) {
-      this.callbacks[name].forEach(function(cb) { cb(data); });
-    };
-    this[name] = function(cb) {
-      this.callbacks[name].push(cb);
-      return this;
-    };
-  }
-
-  callback.call(this, 'onNew');
-  callback.call(this, 'onUpdate');
-
-  function property(store, access) {
-    this[store] = undefined;
-    this[access] = function(val) {
-      if(undefined === val) {
-        return this[store];
-      } else {
-        this[store] = val;
-        return this;
-      }
-    };
-  }
+  callback.call(this, 'new');
+  callback.call(this, 'update');
 
   property.call(this, '_into', 'into');
   property.call(this, 'rowKey', 'key');
@@ -51,8 +59,8 @@ var Renderer = function() {
                || error('makeColumn did not return a selection');
     newRows.classed(row.substr(1), true);
 
-    this.doOnNew(newRows);
-    this.doOnUpdate(rowData);
+    this.doNew(newRows);
+    this.doUpdate(rowData);
 
     return {data: rowData, enter: newRows};
   };
@@ -203,7 +211,7 @@ function drawHamburgers(graph, nodes) {
   semicircle
     .startAngle(Math.PI/2)
     .endAngle(3*Math.PI/2);
-  
+
   // Add exit/below
   var exit = nodes.insert('path', 'rect')
     .classed('exit', true)
@@ -353,8 +361,11 @@ var KnowledgeMap = function(api, config) {
 
   // Create elements on the page for us to render our graph in
   var parentName = config.inside || 'body';
-  var root = d3.select(parentName).append('svg');
-  root.append('svg:defs')
+  var svg = d3.select(parentName).append('svg');
+  var root = svg.append('g');
+
+  // Define the #arrowhead shape for use with edge paths.
+  svg.append('svg:defs')
     .append('svg:marker')
       .attr('id', 'arrowhead')
       .attr('viewBox', '0 0 10 10')
@@ -367,7 +378,22 @@ var KnowledgeMap = function(api, config) {
       .attr('style', 'fill: #333')
       .append('svg:path')
         .attr('d', 'M 0 0 L 10 5 L 0 10 z');
-  this.element = root.append('g');
+
+  // Add a 'backstop' so we can catch pointer events on the entire SVG.
+  root.append('rect')
+      .attr('class', 'overlay')
+      .attr('width', '100%')
+      .attr('height', '100%')
+      .style('fill', 'none')
+      .style('pointer-events', 'all');
+
+  // Make zoomable.
+  var el = this.element = root.append('g');
+  root.call(d3.behavior.zoom().scaleExtent([1, 8]).on("zoom", function () {
+      el.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+    }));
+
+  // Groups for node and edge SVG elements.
   this.edgeContainer = this.element.append('g').classed('edges', true);
   this.nodeContainer = this.element.append('g').classed('nodes', true);
 
@@ -382,7 +408,7 @@ var KnowledgeMap = function(api, config) {
       })
     .onUpdate(function(nodes) {
         nodes.select('text')
-          .text(function(d) { return d.label.split(' ').shift(); });
+          .text(function(d) { return d.label; });
       });
 
   this.positionNodes = new Renderer()
