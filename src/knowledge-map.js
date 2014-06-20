@@ -8,17 +8,17 @@ var Renderer = function() {
 
   function callback(name) {
     this.callbacks[name] = [];
-    this['on' + name[0].toUpperCase() + name.slice(1)] = function(cb) {
+    this['do' + name[0].toUpperCase() + name.slice(1)] = function(data) {
+      this.callbacks[name].forEach(function(cb) { cb(data); });
+    };
+    this[name] = function(cb) {
       this.callbacks[name].push(cb);
       return this;
     };
-    this[name] = function(data) {
-      this.callbacks[name].forEach(function(cb) { cb(data); });
-    };
   }
 
-  callback.call(this, 'rows');
-  callback.call(this, 'newRows');
+  callback.call(this, 'onNew');
+  callback.call(this, 'onUpdate');
 
   function property(store, access) {
     this[store] = undefined;
@@ -51,10 +51,10 @@ var Renderer = function() {
                || error('makeColumn did not return a selection');
     newRows.classed(row.substr(1), true);
 
-    this.newRows(newRows);
-    this.rows(rowData);
+    this.doOnNew(newRows);
+    this.doOnUpdate(rowData);
 
-    return this;
+    return {data: rowData, enter: newRows};
   };
 };
 
@@ -233,7 +233,6 @@ var KnowledgeMap = function(api, config) {
     this.graph.addNode(config.concept.id, {
       label: config.concept.name,
       concept: config.concept,
-      width: 50, height: 20,
     });
 
     // Add dependency edges to the graph
@@ -317,27 +316,37 @@ var KnowledgeMap = function(api, config) {
   };
 
   /*
-  Renders/rerenders the graph elements
+  Lays out the graph and renders it into the DOM.
   */
   this.render = function() {
+    var self = this;
+
+    this.nodes = this.graph.nodes().map(function(id) {
+      return {
+        id: id,
+        value: self.graph.node(id)
+      };
+    });
+    var result = this.renderNodes.run(this.nodes);
+
+    result.data.each(function(d) {
+      d.value.width = this.getBBox().width;
+      d.value.height = this.getBBox().height;
+    });
+
     this.provideLayout(dagre.layout().run(this.graph));
   };
 
   /*
-  Give the graph a layout to be rendered.
+  Give the graph a layout and render it.
   */
   this.provideLayout = function(layout) {
     this.layout = layout;
     var self = this;
-
-    var nodes = layout.nodes().map(function(id) {
-      return {
-        id: id,
-        value: self.graph.node(id),
-        layout: layout.node(id)
-      };
+    this.nodes.forEach(function(node) {
+      node.layout = self.layout.node(node.id);
     });
-    this.renderNodes.run(nodes);
+    this.positionNodes.run(this.nodes);
 
     var edges = layout.edges().map(function(id) {
       return {
@@ -457,23 +466,28 @@ var KnowledgeMap = function(api, config) {
   this.renderNodes = new Renderer()
     .into(this.nodeContainer)
     .key(function(d) { return d.id; })
-    .make(function(e) { return e.append('g'); })
-    .onNewRows(this.defaultOnNewNodes = function(nodes) {
+    .make(function(e) { return e.append('g').classed('km-nodes', true); })
+    .onNew(function(nodes) {
         nodes.append('circle')
           .attr('r', 10);
         nodes.append('text')
           .attr('text-anchor', 'middle');
       })
-    .onRows(this.defaultOnNodes = function(nodes) {
+    .onUpdate(function(nodes) {
         nodes.select('text')
           .text(function(d) { return d.value.label.split(' ').shift(); })
           .attr('fill', 'red');
+      });
+
+  this.positionNodes = new Renderer()
+    .into(this.nodeContainer)
+    .key(function(d) { return d.id; })
+    .make(function(e) { return e.select('g.km-nodes'); })
+    .onUpdate(function(nodes) {
         nodes.select('circle')
-          .transition()
           .attr('cx', function(d) { return d.layout.x; })
           .attr('cy', function(d) { return d.layout.y; });
         nodes.select('text')
-          .transition()
           .attr('x', function(d) { return d.layout.x; })
           .attr('y', function(d) { return d.layout.y; });
       });
@@ -481,13 +495,13 @@ var KnowledgeMap = function(api, config) {
   this.renderEdges = new Renderer()
     .into(this.edgeContainer)
     .key(function(d) { return d.id; })
-    .make(function(e) { return e.append('g'); })
-    .onNewRows(this.defaultOnNewEdges = function(edges) {
+    .make(function(e) { return e.append('g').classed('km-edges', true); })
+    .onNew(function(edges) {
       edges.append('line')
         .attr('stroke-width', 2)
         .attr('stroke', 'black');
     })
-    .onRows(this.defaultOnEdges = function(edges) {
+    .onUpdate(function(edges) {
       edges.select('line')
         .attr('x1', function(d) { return d.u.x; })
         .attr('y1', function(d) { return d.u.y; })
