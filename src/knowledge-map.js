@@ -6,13 +6,18 @@ var dagre = require('dagre');
 function callback(name) {
   this.callbacks[name] = [];
   var capName = name[0].toUpperCase() + name.slice(1);
-  this['do' + capName] = function(data) {
-    this.callbacks[name].forEach(function(cb) { cb(data); });
+
+  this['do' + capName] = function() {
+    var args = Array.prototype.slice.call(arguments);
+    var self = this;
+    this.callbacks[name].forEach(function(cb) { cb.apply(self, args); });
   };
+
   this['on' + capName] = function(cb) {
     this.callbacks[name].push(cb);
     return this;
   };
+
   this['off' + capName] = function(cb) {
     var idx = this.callbacks[name].indexOf(cb);
     if(-1 !== idx) {
@@ -34,13 +39,14 @@ function property(store, access) {
   };
 }
 
-var Renderer = function() {
+function Renderer() {
   this.callbacks = {};
 
   callback.call(this, 'new');
   callback.call(this, 'update');
 
   property.call(this, '_into', 'into');
+  property.call(this, 'cls', 'useClass');
   property.call(this, 'rowKey', 'key');
   property.call(this, 'makeRows', 'make');
 
@@ -49,15 +55,20 @@ var Renderer = function() {
       throw message;
     }
 
-    var row = '.km-row';
+    var row = this.cls || 'km-row';
 
-    var rows = this.into().selectAll(row);
+    var rows = this.into().selectAll('.' + row);
     var rowData = rows.data(data, this.rowKey);
     rowData.exit().remove();
 
-    var newRows = this.makeRows(rowData.enter())
-               || error('makeColumn did not return a selection');
-    newRows.classed(row.substr(1), true);
+    if(this.makeRows) {
+      var newRows = this.makeRows(rowData.enter());
+    } else if(this.cls) {
+      var newRows = rowData.enter().select(this.cls);
+    } else {
+      error('makeColumn did not return a selection');
+    }
+    newRows.classed(row, true);
 
     this.doNew(newRows);
     this.doUpdate(rowData);
@@ -108,21 +119,61 @@ will be rendered by dagre-d3.
 
 json: TODO describe what the json should look like
 */
-var createGraph = function(json) {
-  var self = this;
+function createGraph(json) {
   this.hold();
-
   if (json && json.concepts) {
     // Add all the concepts as nodes
+    var self = this;
     json.concepts.forEach(function(concept) {
       self.addConcept({
         concept: concept
       });
     });
   }
+  this.unhold();
 
-  return this.unhold();
+  return this;
 };
+
+function setupSVG(config) {
+  // Create elements on the page for us to render our graph in
+  var parentName = config.inside || 'body';
+  var svg = d3.select(parentName).append('svg');
+  var root = svg.append('g');
+
+  // Define the #arrowhead shape for use with edge paths.
+  svg.append('svg:defs')
+    .append('svg:marker')
+      .attr('id', 'arrowhead')
+      .attr('viewBox', '0 0 10 10')
+      .attr('refX', 8)
+      .attr('refY', 5)
+      .attr('markerUnits', 'strokeWidth')
+      .attr('markerWidth', 8)
+      .attr('markerHeight', 5)
+      .attr('orient', 'auto')
+      .attr('style', 'fill: #333')
+      .append('svg:path')
+        .attr('d', 'M 0 0 L 10 5 L 0 10 z');
+
+  // Add a 'backstop' so we can catch pointer events on the entire SVG.
+  root.append('rect')
+      .attr('class', 'overlay')
+      .attr('width', '100%')
+      .attr('height', '100%')
+      .style('fill', 'none')
+      .style('pointer-events', 'all');
+
+  // Make zoomable.
+  var el = this.element = root.append('g');
+  root.call(d3.behavior.zoom().scaleExtent([0.3, 1]).on("zoom", function () {
+      el.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+    }));
+
+  // Groups for node and edge SVG elements.
+  this.edgeContainer = this.element.append('g').classed('edges', true);
+  this.nodeContainer = this.element.append('g').classed('nodes', true);
+}
 
 /*
 Creates the points for the paths that make up the edges
@@ -359,92 +410,89 @@ var KnowledgeMap = function(api, config) {
     return this.graph.hasEdge(dep+'-'+concept);
   };
 
-  // Create elements on the page for us to render our graph in
-  var parentName = config.inside || 'body';
-  var svg = d3.select(parentName).append('svg');
-  var root = svg.append('g');
+  /*
+  Creates node text labels.
+  */
+  this.defaultNewNodes = function(nodes) {
+    nodes.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('alignment-baseline', 'middle');
+  };
 
-  // Define the #arrowhead shape for use with edge paths.
-  svg.append('svg:defs')
-    .append('svg:marker')
-      .attr('id', 'arrowhead')
-      .attr('viewBox', '0 0 10 10')
-      .attr('refX', 8)
-      .attr('refY', 5)
-      .attr('markerUnits', 'strokeWidth')
-      .attr('markerWidth', 8)
-      .attr('markerHeight', 5)
-      .attr('orient', 'auto')
-      .attr('style', 'fill: #333')
-      .append('svg:path')
-        .attr('d', 'M 0 0 L 10 5 L 0 10 z');
+  /*
+  Sets node labels.
+  */
+  this.defaultUpdateNodes = function(nodes) {
+    nodes.select('text')
+      .text(function(d) { return d.label; });
+  };
 
-  // Add a 'backstop' so we can catch pointer events on the entire SVG.
-  root.append('rect')
-      .attr('class', 'overlay')
-      .attr('width', '100%')
-      .attr('height', '100%')
-      .style('fill', 'none')
-      .style('pointer-events', 'all');
+  /*
+  Sets node text positions.
+  */
+  this.defaultUpdateNodePositions = function(nodes) {
+    nodes.select('text')
+      .attr('x', function(n) { return n.layout.x; })
+      .attr('y', function(n) { return n.layout.y; });
+  };
 
-  // Make zoomable.
-  var el = this.element = root.append('g');
-  root.call(d3.behavior.zoom().scaleExtent([1, 8]).on("zoom", function () {
-      el.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
-    }));
+  /*
+  Creates edge paths.
+  */
+  this.defaultNewEdges = function(edges) {
+    edges.append('path')
+      .attr('marker-end', 'url(#arrowhead)');
+  };
 
-  // Groups for node and edge SVG elements.
-  this.edgeContainer = this.element.append('g').classed('edges', true);
-  this.nodeContainer = this.element.append('g').classed('nodes', true);
+  /*
+  Positions edge paths.
+  */
+  this.defaultUpdateEdges = function(edges) {
+    edges.select('path')
+      .attr('d', function(e) {
+        var path = e.layout.points.slice();
+        var p0 = path.length === 0 ? e.source.layout : path[0];
+        var p1 = path.length === 0 ? e.target.layout : path[path.length - 1];
+        path.unshift(intersectRect(e.source.layout, p0));
+        path.push(intersectRect(e.target.layout, p1));
+
+        return d3.svg.line()
+          .x(function(d) { return d.x; })
+          .y(function(d) { return d.y; })
+          .interpolate('basis')
+          (path);
+      });
+  };
+
+  // Create the SVG elements on the page necessary for this graph.
+  setupSVG.call(this, config);
+
+  // Create the three Renderers that link data to the DOM via the default
+  // methods defined above. Extending the renderer is a matter of adding more
+  // callbacks onNew and onUpdate. You can also remove the default behavior by
+  // calling offNew or offUpdate with the default functions.
 
   this.renderNodes = new Renderer()
     .into(this.nodeContainer)
     .key(function(n) { return n.concept.id; })
-    .make(function(e) { return e.append('g').classed('node', true); })
-    .onNew(function(nodes) {
-        nodes.append('text')
-          .attr('text-anchor', 'middle')
-          .attr('alignment-baseline', 'middle');
-      })
-    .onUpdate(function(nodes) {
-        nodes.select('text')
-          .text(function(d) { return d.label; });
-      });
+    .make(function(e) { return e.append('g'); })
+    .useClass('node')
+    .onNew(this.defaultNewNodes)
+    .onUpdate(this.defaultUpdateNodes);
 
   this.positionNodes = new Renderer()
     .into(this.nodeContainer)
     .key(function(n) { return n.concept.id; })
-    .make(function(e) { return e.select('g.node'); })
-    .onUpdate(function(nodes) {
-        nodes.select('text')
-          .attr('x', function(n) { return n.layout.x; })
-          .attr('y', function(n) { return n.layout.y; });
-      });
+    .useClass('node')
+    .onUpdate(this.defaultUpdateNodePositions);
 
   this.renderEdges = new Renderer()
     .into(this.edgeContainer)
     .key(function(d) { return d.id; })
-    .make(function(e) { return e.append('g').classed('edgePath', true); })
-    .onNew(function(edges) {
-      edges.append('path')
-        .attr('marker-end', 'url(#arrowhead)');
-    })
-    .onUpdate(function(edges) {
-      edges.select('path')
-        .attr('d', function(e) {
-          var path = e.layout.points.slice();
-          var p0 = path.length === 0 ? e.source.layout : path[0];
-          var p1 = path.length === 0 ? e.target.layout : path[path.length - 1];
-          path.unshift(intersectRect(e.source.layout, p0));
-          path.push(intersectRect(e.target.layout, p1));
-
-          return d3.svg.line()
-            .x(function(d) { return d.x; })
-            .y(function(d) { return d.y; })
-            .interpolate('basis')
-            (path);
-        });
-    });
+    .make(function(e) { return e.append('g'); })
+    .useClass('edgePath')
+    .onNew(this.defaultNewEdges)
+    .onUpdate(this.defaultUpdateEdges);
 
   /*
   Lays out the graph and renders it into the DOM.
@@ -597,7 +645,7 @@ var KnowledgeMap = function(api, config) {
   this.graph = new dagre.Digraph();
   createGraph.call(this, config.graph);
 
-  // Initialise plugins for graph.
+  // Initialise plugins.
   if(config && config.plugins) {
     for(var i = 0; i < config.plugins.length; i++) {
       var plugin = config.plugins[i];

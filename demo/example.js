@@ -19,6 +19,14 @@ var knowledge = {
       }]
     },
     {
+      id: "learning",
+      name: "Learning using knowledge maps",
+      dependencies: ["viewing"],
+      content: [{
+        text: "You can learn by using the resources attached to a concept or by contacting people who know the concept. The best knowledge maps will give you lots of different resources to try and learn each concept.",
+      }]
+    },
+    {
       id: "creating",
       name: "Create your own knowledge map",
       dependencies: ["knowledge-map", "viewing"],
@@ -41,20 +49,17 @@ var knowledge = {
       content: [{
         text: "Once you've created your own knowledge map you can share it in various ways. You can embed the knowledge map in your website or save it as an image.",
       }]
-    },
-    {
-      id: "learning",
-      name: "Learning using knowledge maps",
-      dependencies: ["viewing"],
-      content: [{
-        text: "You can learn by using the resources attached to a concept or by contacting people who know the concept. The best knowledge maps will give you lots of different resources to try and learn each concept.",
-      }]
     }
   ]
 };
 
 // Create graph that visualises the knowledge
-knowledgeMap.create({
+var km = knowledgeMap.create({
   graph: knowledge,
-  plugins: ['modals'],
+  plugins: ['modals', {
+    name: 'remove-edges',
+    run: function(km) {
+      //km.renderEdges.offUpdate(km.defaultUpdateEdges);
+    }
+  }],
 });
