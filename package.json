@@ -14,8 +14,7 @@
     "jshint": "",
     "karma": "~0.10",
     "karma-firefox-launcher": "~0.1",
-	 "dagre": "~0.4.5",
-    "grid-d3": "git://github.com/knowledge-map/grid-d3.git#master"
+	 "dagre": "~0.4.5"
   },
   "dependencies": {
     "d3": "~3.3.8",

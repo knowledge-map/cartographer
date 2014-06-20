@@ -1,6 +1,5 @@
 var km = require('../src/knowledge-map.js');
-var dagre = km.dagre;
-var d3 = km.d3;
+var dagre = km.dagre, d3 = km.d3;
 var grid = require('../node_modules/grid-d3/src/grid-d3.js');
 
 window.onload = function() {

@@ -2,7 +2,61 @@
 
 var d3 = require('d3');
 var dagre = require('dagre');
-var grid = require('../node_modules/grid-d3/src/grid-d3.js');
+
+var Renderer = function() {
+  this.callbacks = {};
+
+  function callback(name) {
+    this.callbacks[name] = [];
+    this['on' + name[0].toUpperCase() + name.slice(1)] = function(cb) {
+      this.callbacks[name].push(cb);
+      return this;
+    };
+    this[name] = function(data) {
+      this.callbacks[name].forEach(function(cb) { cb(data); });
+    };
+  }
+
+  callback.call(this, 'rows');
+  callback.call(this, 'newRows');
+
+  function property(store, access) {
+    this[store] = undefined;
+    this[access] = function(val) {
+      if(undefined === val) {
+        return this[store];
+      } else {
+        this[store] = val;
+        return this;
+      }
+    };
+  }
+
+  property.call(this, '_into', 'into');
+  property.call(this, 'rowKey', 'key');
+  property.call(this, 'makeRows', 'make');
+
+  this.run = function (data) {
+    function error(message) {
+      throw message;
+    }
+
+    var row = '.km-row';
+
+    var rows = this.into().selectAll(row);
+    var rowData = rows.data(data, this.rowKey);
+    rowData.exit().remove();
+
+    var newRows = this.makeRows(rowData.enter())
+               || error('makeColumn did not return a selection');
+    newRows.classed(row.substr(1), true);
+
+    this.newRows(newRows);
+    this.rows(rowData);
+
+    return this;
+  };
+};
 
 /*
 Given a JSON object with the knowledge data, create a graph object which
@@ -276,16 +330,16 @@ var KnowledgeMap = function(api, config) {
     this.layout = layout;
     var self = this;
 
-    var nodes = [layout.nodes().map(function(id) {
+    var nodes = layout.nodes().map(function(id) {
       return {
         id: id,
         value: self.graph.node(id),
         layout: layout.node(id)
       };
-    })];
-    grid.render2D(nodes, this.asNodes);
+    });
+    this.renderNodes.run(nodes);
 
-    var edges = [layout.edges().map(function(id) {
+    var edges = layout.edges().map(function(id) {
       return {
         id: id,
         u: layout.node(layout._edges[id].u),
@@ -293,8 +347,8 @@ var KnowledgeMap = function(api, config) {
         value: self.graph.edge(id),
         layout: layout.edge(id)
       };
-    })];
-    grid.render2D(edges, this.asEdges);
+    });
+    this.renderEdges.run(edges);
   };
 
   /*
@@ -400,77 +454,45 @@ var KnowledgeMap = function(api, config) {
   this.edgeContainer = this.element.append('g').classed('edges', true);
   this.nodeContainer = this.element.append('g').classed('nodes', true);
 
-  // Rendering stuff
-  var AsNodes = function(config) {
-    config = config || {};
-    grid.GridBase.call(this);
-
-    this.cellKey = function(d) { return d.id; };
-
-    this.makeRow = config.makeRow || function(e) {
-      return e.append('g');
-    };
-
-    this.makeColumn = config.makeColumn || function(e) {
-      return e.append('g');
-    };
-
-    this.onCells(this.defaultOnCells = function(cells) {
-      cells.select('circle')
-        .transition()
-        .attr('cx', function(d) { return d.layout.x; })
-        .attr('cy', function(d) { return d.layout.y; });
-      cells.select('text')
-        .transition()
-        .attr('x', function(d) { return d.layout.x; })
-        .attr('y', function(d) { return d.layout.y; });
-    });
-
-    this.onNewCells(this.defaultOnNewCells = function(cells) {
-      cells.append('circle')
-        .attr('r', 10);
-      cells.append('text')
-        .attr('text-anchor', 'middle');
-    });
-  };
-
-  var AsEdges = function(config) {
-    config = config || {};
-    grid.GridBase.call(this);
-
-    this.makeRow = config.makeRow || function(e) {
-      return e.append('g');
-    };
-
-    this.makeColumn = config.makeColumn || function(e) {
-      return e.append('g');
-    };
-  };
-
-  this.asNodes = new AsNodes()
+  this.renderNodes = new Renderer()
     .into(this.nodeContainer)
-    .onCells(function(cells) {
-      cells.select('text')
-        .text(function(d) { return d.value.label.split(' ').shift(); })
-        .attr('fill', 'red');
-    })
-    .onNewCells(function(cells) {
-      //cells.style('opacity', 0).transition().style('opacity', 1);
-    });
+    .key(function(d) { return d.id; })
+    .make(function(e) { return e.append('g'); })
+    .onNewRows(this.defaultOnNewNodes = function(nodes) {
+        nodes.append('circle')
+          .attr('r', 10);
+        nodes.append('text')
+          .attr('text-anchor', 'middle');
+      })
+    .onRows(this.defaultOnNodes = function(nodes) {
+        nodes.select('text')
+          .text(function(d) { return d.value.label.split(' ').shift(); })
+          .attr('fill', 'red');
+        nodes.select('circle')
+          .transition()
+          .attr('cx', function(d) { return d.layout.x; })
+          .attr('cy', function(d) { return d.layout.y; });
+        nodes.select('text')
+          .transition()
+          .attr('x', function(d) { return d.layout.x; })
+          .attr('y', function(d) { return d.layout.y; });
+      });
 
-  this.asEdges = new AsEdges()
+  this.renderEdges = new Renderer()
     .into(this.edgeContainer)
-    .onCells(function(cells) {
-      cells.select('line')
+    .key(function(d) { return d.id; })
+    .make(function(e) { return e.append('g'); })
+    .onNewRows(this.defaultOnNewEdges = function(edges) {
+      edges.append('line')
+        .attr('stroke-width', 2)
+        .attr('stroke', 'black');
+    })
+    .onRows(this.defaultOnEdges = function(edges) {
+      edges.select('line')
         .attr('x1', function(d) { return d.u.x; })
         .attr('y1', function(d) { return d.u.y; })
         .attr('x2', function(d) { return d.v.x; })
         .attr('y2', function(d) { return d.v.y; });
-    })
-    .onNewCells(function(cells) {
-      cells.append('line')
-        .attr('stroke-width', 2)
-        .attr('stroke', 'black');
     });
 
   // Initialise plugins for graph.
