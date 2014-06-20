@@ -1,5 +1,6 @@
 var d3 = require('d3');
 var modal = require('../node_modules/PicoModal/src/picoModal.js');
+var markdown = require('markdown').markdown;
 
 function addNodeModalEvents(kg, graph, nodes) {
   nodes.select('text')
@@ -28,24 +29,46 @@ function addNodeModalEvents(kg, graph, nodes) {
       modalElem.append('input')
         .attr('type', 'text')
         .attr('id', 'title')
-        .property('value', title);
+        .property('value', title)
+        .style('margin-bottom', '10px');
 
       var contentArea = modalElem.append('div').attr('class', 'content-area');
 
       // A function to create a new content item from a given JS object
       var article = function(type, content, index) {
+        var tabGroup = contentArea.append('div')
+          .attr('contentid', index);
+        tabGroup.append('button')
+          .text('Edit')
+          .on('click', function() {
+            d3.select('#preview'+index).style('display', 'none');
+            d3.select('#edit'+index).style('display', 'block');
+          });
+        tabGroup.append('button')
+          .text('Preview')
+          .on('click', function() {
+            d3.select('#edit'+index).style('display', 'none');
+            updatePreview(index);
+            d3.select('#preview'+index).style('display', 'block');
+          });
         var articleElem = contentArea.append('article')
           .attr('class', type)
-          .attr('id', index)
-          .style({
-            'border-color': '#cccccc',
-            'border-style': 'dashed',
-            'border-width': 'thin',
-            'padding-left': '13px',
-            'padding-right': '7px',
-            'margin-top': '10px',
-            'margin-bottom': '10px',
-          });
+          .attr('contentid', index)
+          .attr('id', 'edit'+index);
+        var previewElem = contentArea.append('article')
+          .attr('class', type)
+          .attr('contentid', index)
+          .attr('id', 'preview'+index)
+          .style('display', 'none');
+        d3.selectAll('.'+type).style({
+          'border-color': '#cccccc',
+          'border-style': 'dashed',
+          'border-width': 'thin',
+          'padding-left': '13px',
+          'padding-right': '7px',
+          'margin-top': '-3px',
+          'margin-bottom': '13px',
+        });
         articleElem.append('div')
           .text('×')
           .attr('class', 'content-delete')
@@ -60,7 +83,7 @@ function addNodeModalEvents(kg, graph, nodes) {
           })
           .on('click', function() {
             // If the content's x is clicked, temporarily hide the HTML and don't delete until saveContent()
-            var contentId = parseInt(this.parentNode.id);
+            var contentId = parseInt(this.parentNode.contentid);
             // If we're removing a newly added element that hasn't been saved, just delete the node
             // without worrying about the contents
             if(!contentId && contentId != 0) {
@@ -73,21 +96,17 @@ function addNodeModalEvents(kg, graph, nodes) {
               d3.select('#no-content-msg').style('display', 'block');
             }
           });
-        if(type == 'textContent') {
+        articleElem.append('input')
+          .attr('class', 'title')
+          .attr('type', 'text')
+          .property('value', content.title);
+        if(type == 'linkContent') {
           articleElem.append('input')
-            .attr('class', 'title')
-            .attr('type', 'text')
-            .property('value', content.title);
-        } else if(type == 'linkContent') {
-          articleElem.append('input')
-            .attr('class', 'title')
-            .attr('type', 'text')
-            .property('value', content.title);
-          articleElem.append('input')
+            .attr('class', 'link')
             .attr('type', 'url')
             .property('value', content.link);
         }
-        var textarea = articleElem.append('p').append('textarea');
+        var textarea = articleElem.append('p').append('textarea').attr('class', 'text');
         if(type == 'textContent') {
           textarea.property('value', content.text);
         } else if(type == 'linkContent') {
@@ -135,6 +154,30 @@ function addNodeModalEvents(kg, graph, nodes) {
       modalElem.append('button')
         .attr('id', 'deleteConceptBtn')
         .text('Delete Concept');
+
+      var updatePreview = function(contentId) {
+        var previewElem = d3.select('#preview'+contentId);
+        while(previewElem.node().firstChild) {
+          previewElem.node().removeChild(previewElem.node().firstChild);
+        }
+        var title = d3.select('#edit'+contentId+' .title').property('value');
+        previewElem.append('h2')
+          .attr('type', 'text')
+          .text(title);
+        var text = d3.select('#edit'+contentId+' .text').property('value');
+        if(previewElem.attr('class') == 'textContent') {
+          previewElem.append('p')
+            .html(markdown.toHTML(text));
+        } else if(previewElem.attr('class') == 'linkContent') {
+          var link = d3.select('#edit'+contentId+' .link').property('value');
+          previewElem.append('a')
+            .attr('href', link)
+            .attr('type', 'url')
+            .text(title);
+          previewElem.append('p')
+            .html(markdown.toHTML(text));
+        }
+      }
 
       var saveContent = function() {
         // Update the value of whatever was changed in the modal into the graph.
