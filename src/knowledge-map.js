@@ -59,6 +59,42 @@ var Renderer = function() {
 };
 
 /*
+Rectangle intersection from dagre-d3 source.
+*/
+function intersectRect(rect, point) {
+  var x = rect.x;
+  var y = rect.y;
+
+  // For now we only support rectangles
+
+  // Rectangle intersection algorithm from:
+  // http://math.stackexchange.com/questions/108113/find-edge-between-two-boxes
+  var dx = point.x - x;
+  var dy = point.y - y;
+  var w = rect.width / 2;
+  var h = rect.height / 2;
+
+  var sx, sy;
+  if (Math.abs(dy) * w > Math.abs(dx) * h) {
+    // Intersection is top or bottom of rect.
+    if (dy < 0) {
+      h = -h;
+    }
+    sx = dy === 0 ? 0 : h * dx / dy;
+    sy = h;
+  } else {
+    // Intersection is left or right of rect.
+    if (dx < 0) {
+      w = -w;
+    }
+    sx = w;
+    sy = dx === 0 ? 0 : w * dy / dx;
+  }
+
+  return {x: x + sx, y: y + sy};
+}
+
+/*
 Given a JSON object with the knowledge data, create a graph object which
 will be rendered by dagre-d3.
 
@@ -315,49 +351,127 @@ var KnowledgeMap = function(api, config) {
     return this.graph.hasEdge(dep+'-'+concept);
   };
 
+  // Create elements on the page for us to render our graph in
+  var parentName = config.inside || 'body';
+  var root = d3.select(parentName).append('svg');
+  root.append('svg:defs')
+    .append('svg:marker')
+      .attr('id', 'arrowhead')
+      .attr('viewBox', '0 0 10 10')
+      .attr('refX', 8)
+      .attr('refY', 5)
+      .attr('markerUnits', 'strokeWidth')
+      .attr('markerWidth', 8)
+      .attr('markerHeight', 5)
+      .attr('orient', 'auto')
+      .attr('style', 'fill: #333')
+      .append('svg:path')
+        .attr('d', 'M 0 0 L 10 5 L 0 10 z');
+  this.element = root.append('g');
+  this.edgeContainer = this.element.append('g').classed('edges', true);
+  this.nodeContainer = this.element.append('g').classed('nodes', true);
+
+  this.renderNodes = new Renderer()
+    .into(this.nodeContainer)
+    .key(function(n) { return n.concept.id; })
+    .make(function(e) { return e.append('g').classed('node', true); })
+    .onNew(function(nodes) {
+        nodes.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('alignment-baseline', 'middle');
+      })
+    .onUpdate(function(nodes) {
+        nodes.select('text')
+          .text(function(d) { return d.label.split(' ').shift(); });
+      });
+
+  this.positionNodes = new Renderer()
+    .into(this.nodeContainer)
+    .key(function(n) { return n.concept.id; })
+    .make(function(e) { return e.select('g.node'); })
+    .onUpdate(function(nodes) {
+        nodes.select('text')
+          .attr('x', function(n) { return n.layout.x; })
+          .attr('y', function(n) { return n.layout.y; });
+      });
+
+  this.renderEdges = new Renderer()
+    .into(this.edgeContainer)
+    .key(function(d) { return d.id; })
+    .make(function(e) { return e.append('g').classed('edgePath', true); })
+    .onNew(function(edges) {
+      edges.append('path')
+        .attr('marker-end', 'url(#arrowhead)');
+    })
+    .onUpdate(function(edges) {
+      edges.select('path')
+        .attr('d', function(e) {
+          var path = e.layout.points.slice();
+          var p0 = path.length === 0 ? e.source.layout : path[0];
+          var p1 = path.length === 0 ? e.target.layout : path[path.length - 1];
+          path.unshift(intersectRect(e.source.layout, p0));
+          path.push(intersectRect(e.target.layout, p1));
+
+          return d3.svg.line()
+            .x(function(d) { return d.x; })
+            .y(function(d) { return d.y; })
+            .interpolate('basis')
+            (path);
+        });
+    });
+
   /*
   Lays out the graph and renders it into the DOM.
   */
   this.render = function() {
     var self = this;
 
+    // Instead of a list of IDs, our data should be a list of objects.
     this.nodes = this.graph.nodes().map(function(id) {
-      return {
-        id: id,
-        value: self.graph.node(id)
-      };
+      return self.graph.node(id);
     });
     var result = this.renderNodes.run(this.nodes);
 
+    // Add width and height information from the SVG elements.
     result.data.each(function(d) {
-      d.value.width = this.getBBox().width;
-      d.value.height = this.getBBox().height;
+      d.width = this.getBBox().width;
+      d.height = this.getBBox().height;
     });
 
-    this.provideLayout(dagre.layout().run(this.graph));
+    // Generate a graph layout and render it.
+    var layout = dagre.layout().run(this.graph);
+    this.postEvent({
+      type: 'preLayout',
+      layout: layout,
+    });
+    this.provideLayout(layout);
   };
 
   /*
   Give the graph a layout and render it.
   */
   this.provideLayout = function(layout) {
-    this.layout = layout;
     var self = this;
+    var g = this.graph;
+
+    // Augment existing node data with layout information.
     this.nodes.forEach(function(node) {
-      node.layout = self.layout.node(node.id);
+      node.layout = layout.node(node.concept.id);
     });
     this.positionNodes.run(this.nodes);
 
     var edges = layout.edges().map(function(id) {
       return {
         id: id,
-        u: layout.node(layout._edges[id].u),
-        v: layout.node(layout._edges[id].v),
-        value: self.graph.edge(id),
+        source: g.node(g.incidentNodes(id)[0]),
+        target: g.node(g.incidentNodes(id)[1]),
+        value: g.edge(id),
         layout: layout.edge(id)
       };
     });
     this.renderEdges.run(edges);
+
+    this.layout = layout;
   };
 
   /*
@@ -456,58 +570,6 @@ var KnowledgeMap = function(api, config) {
   // Create the directed graph
   this.graph = new dagre.Digraph();
   createGraph.call(this, config.graph);
-
-  // Create an element on the page for us to render our graph in
-  var parentName = config.inside || 'body';
-  this.element = d3.select(parentName).append('svg').append('g');
-  this.edgeContainer = this.element.append('g').classed('edges', true);
-  this.nodeContainer = this.element.append('g').classed('nodes', true);
-
-  this.renderNodes = new Renderer()
-    .into(this.nodeContainer)
-    .key(function(d) { return d.id; })
-    .make(function(e) { return e.append('g').classed('km-nodes', true); })
-    .onNew(function(nodes) {
-        nodes.append('circle')
-          .attr('r', 10);
-        nodes.append('text')
-          .attr('text-anchor', 'middle');
-      })
-    .onUpdate(function(nodes) {
-        nodes.select('text')
-          .text(function(d) { return d.value.label.split(' ').shift(); })
-          .attr('fill', 'red');
-      });
-
-  this.positionNodes = new Renderer()
-    .into(this.nodeContainer)
-    .key(function(d) { return d.id; })
-    .make(function(e) { return e.select('g.km-nodes'); })
-    .onUpdate(function(nodes) {
-        nodes.select('circle')
-          .attr('cx', function(d) { return d.layout.x; })
-          .attr('cy', function(d) { return d.layout.y; });
-        nodes.select('text')
-          .attr('x', function(d) { return d.layout.x; })
-          .attr('y', function(d) { return d.layout.y; });
-      });
-
-  this.renderEdges = new Renderer()
-    .into(this.edgeContainer)
-    .key(function(d) { return d.id; })
-    .make(function(e) { return e.append('g').classed('km-edges', true); })
-    .onNew(function(edges) {
-      edges.append('line')
-        .attr('stroke-width', 2)
-        .attr('stroke', 'black');
-    })
-    .onUpdate(function(edges) {
-      edges.select('line')
-        .attr('x1', function(d) { return d.u.x; })
-        .attr('y1', function(d) { return d.u.y; })
-        .attr('x2', function(d) { return d.v.x; })
-        .attr('y2', function(d) { return d.v.y; });
-    });
 
   // Initialise plugins for graph.
   if(config && config.plugins) {

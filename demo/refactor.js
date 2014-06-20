@@ -56,7 +56,17 @@ window.onload = function() {
   };
 
   // Create graph that visualises the knowledge
-  km.create({
+  var g = km.create({
     graph: knowledge,
   });
+
+  window.onclick = function() {
+    var stamp = new Date();
+    g.addConcept({
+      concept: {
+        id: stamp.toISOString(),
+        name: '' + stamp.getSeconds(),
+      }
+    });
+  };
 };
