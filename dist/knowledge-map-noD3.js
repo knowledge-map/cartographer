@@ -5196,10 +5196,31 @@ function addConnectionEditing(graph, nodes) {
   return nodes;
 }
 
+function addEdgeDeleteButtons(graph, edges, result) {
+  var kg = this;
+  edges.selectAll('circle.delete').remove();
+  setTimeout(function() {
+    edges.append('circle')
+      .classed('delete', true)
+      .attr('r', 3)
+      .style('cursor', 'pointer')
+      .attr('cx', function(d) {
+        return result.edge(d).points[0].x;
+      })
+      .attr('cy', function(d) {
+        return result.edge(d).points[0].y;
+      })
+      .on('click', function(depID) {
+        kg.removeDependency({dependency: depID});
+      });
+  }, kg.config.transitionDuration || 500);
+}
+
 function setupEditing(kg) {
   kg.onEvent('renderGraph', function(e) {
     addConnectionEditing.call(kg, e.graph, e.nodes);
     addChangeableLabels.call(kg, e.graph, e.nodes);
+    addEdgeDeleteButtons.call(kg, e.graph, e.edges, e.result);
   });
 };
 
@@ -5223,27 +5244,21 @@ will be rendered by dagre-d3.
 json: TODO describe what the json should look like
 
 */
-var createGraph = function(json) {
-  var graph = new dagreD3.Digraph();
+var createGraph = function(kg, json) {
+  var graph = kg.graph = new dagreD3.Digraph();
+  if (!json)
+    return;
 
-  if (json && json.concepts) {
+  if (json.concepts) {
     // Add all the concepts as nodes
     json.concepts.forEach(function(concept) {
-      graph.addNode(concept.id, {
-       label: concept.name,
-       concept: concept,
-      });
+      kg.addConcept({concept: concept});
     });
-    // Check each concept for dependencies and add them as edges
-    json.concepts.forEach(function(concept) {
-      if (Array.isArray(concept.dependencies)) {
-        concept.dependencies.forEach(function(dep) {
-          // Add an edge from the dependency to the concept with a null edge ID
-          graph.addEdge(dep+'-'+concept.id, dep, concept.id);
-        });
-      } else {
-        // Dependencies is undefine/not an array and we'll figure out what to do with it later
-      }
+  }
+
+  if (json.dependencies) {
+    json.dependencies.forEach(function(dep) {
+      kg.addDependency(dep);
     });
   }
 
@@ -5365,66 +5380,7 @@ Accepts a single object:
 */
 var KnowledgeMap = function(api, config) {
   config = config || {};
-
-  // Create the directed graph
-  var graph = this.graph = createGraph(config.graph);
-
-  // Create an element on the page for us to render our graph in
-  var parentName = config.inside || 'body';
-  var element = this.element = d3.select(parentName).append('svg');
-
-  // Use dagre-d3 to render the graph
-  var renderer = this.renderer = new dagreD3.Renderer();
-  var layout   = this.layout   = dagreD3.layout().rankSep(50);
-  if (config.layout) {
-    if (config.layout.verticalSpace)   layout.rankSep(config.layout.verticalSpace);
-    if (config.layout.horizontalSpace) layout.nodeSep(config.layout.horizontalSpace);
-    if (config.layout.direction)       layout.rankDir(config.layout.direction);
-  }
-
-  // Update the way edges are positioned
-  renderer.layout(layout);
-  renderer.positionEdgePaths(positionEdgePaths);
-
-  // Add transitions for graph updates
-  renderer.transition(function(selection) {
-    var duration;
-    if (config && config.transitionDuration !== undefined) {
-      duration = config.transitionDuration;
-    } else {
-      duration = 500;
-    }
-
-    if (duration) {
-      return selection
-        .transition()
-          .duration(duration);
-    } else {
-      return selection;
-    }
-  });
-
-  // Add enter/exit circles
-  var kg = this;
-  var drawNodes = renderer.drawNodes();
-  renderer.drawNodes(function(graph, element) {
-    var nodes = drawNodes(graph, element);
-
-    // Add class labels
-    nodes.attr('id', function(d) { return d; });
-
-    // Add burger buns
-    drawHamburgers.call(kg, graph, nodes);
-
-    // Add interactivity
-    kg.postEvent({
-      type: 'renderGraph',
-      graph: graph,
-      nodes: nodes
-    });
-
-    return nodes;
-  });
+  this.config = config;
 
   /*
   Message API
@@ -5456,6 +5412,7 @@ var KnowledgeMap = function(api, config) {
   */
   this.addConcept = function(config) {
     var kg = this;
+    window.kg = kg;
 
     // Add node to the graph
     this.graph.addNode(config.concept.id, {
@@ -5509,7 +5466,7 @@ var KnowledgeMap = function(api, config) {
     }
 
     // Add the edge to the graph
-    this.graph.addEdge(dep+'-'+concept.id, dep, concept.id);
+    this.graph.addEdge(dep+'-'+concept.id, dep, concept.id, { dependency: config });
 
     // Update the graph display
     this.render();
@@ -5521,19 +5478,27 @@ var KnowledgeMap = function(api, config) {
 
   */
   this.removeDependency = function(config) {
-    // Get ids of concepts
-    var con = config.concept;
-    var dep = config.dependency;
+    if (config.concept) {
+      // Get ids of concepts
+      var con = config.concept;
+      var dep = config.dependency;
 
-    // Remove the dependency from the concept
-    var concept = this.graph.node(con).concept;
-    if (concept.dependencies) {
-      var index = concept.dependencies.indexOf(dep);
-      concept.dependencies.splice(index, 1);
+      // Remove the dependency from the concept
+      var concept = this.graph.node(con).concept;
+      if (concept.dependencies) {
+        var index = concept.dependencies.indexOf(dep);
+        concept.dependencies.splice(index, 1);
+      }
+
+      // Remove the edge from the graph
+      this.graph.delEdge(dep+'-'+con);
+    } else {
+      var dep = this.graph.edge(config.dependency).dependency;
+      this.removeDependency({
+        concept: dep.concept.id,
+        dependency: dep.dependency
+      });
     }
-
-    // Remove the edge from the graph
-    this.graph.delEdge(dep+'-'+con);
 
     // Update the graph display
     this.render();
@@ -5682,6 +5647,72 @@ var KnowledgeMap = function(api, config) {
     });
     this.__defineSetter__('plugins', function() {});
   }
+
+  // Create an element on the page for us to render our graph in
+  var parentName = config.inside || 'body';
+  var element = this.element = d3.select(parentName).append('svg');
+
+  // Use dagre-d3 to render the graph
+  var renderer = this.renderer = new dagreD3.Renderer();
+  var layout   = this.layout   = dagreD3.layout().rankSep(50);
+  if (config.layout) {
+    if (config.layout.verticalSpace)   layout.rankSep(config.layout.verticalSpace);
+    if (config.layout.horizontalSpace) layout.nodeSep(config.layout.horizontalSpace);
+    if (config.layout.direction)       layout.rankDir(config.layout.direction);
+  }
+
+  // Update the way edges are positioned
+  renderer.layout(layout);
+  renderer.positionEdgePaths(positionEdgePaths);
+
+  // Add transitions for graph updates
+  renderer.transition(function(selection) {
+    var duration = config.transitionDuration || 500;
+
+      return selection
+        .transition()
+          .duration(duration);
+  });
+
+  var kg = this;
+  var _renderData = {};
+
+  var drawNodes = renderer.drawNodes();
+  renderer.drawNodes(function(graph, element) {
+    var nodes = drawNodes(graph, element);
+
+    // Add class labels
+    nodes.attr('id', function(d) { return d; });
+
+    // Add burger buns
+    drawHamburgers.call(kg, graph, nodes);
+
+    _renderData.nodes = nodes;
+    return nodes;
+  });
+
+  var drawEdgePaths = renderer.drawEdgePaths();
+  renderer.drawEdgePaths(function(graph, element) {
+    var edges = drawEdgePaths(graph, element);
+    _renderData.edges = edges;
+    return edges;
+  });
+
+  var postRender = renderer.postRender();
+  renderer.postRender(function(result, root) {
+    var res = postRender(result, root);
+    kg.postEvent({
+      type: 'renderGraph',
+      graph: kg.graph,
+      result: result,
+      nodes: _renderData.nodes,
+      edges: _renderData.edges
+    });
+    return res;
+  });
+
+  // Create the directed graph
+  var graph = createGraph(this, config.graph);
 
   // Display the graph
   this.render();

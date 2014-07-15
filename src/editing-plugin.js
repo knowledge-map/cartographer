@@ -149,10 +149,31 @@ function addConnectionEditing(graph, nodes) {
   return nodes;
 }
 
+function addEdgeDeleteButtons(graph, edges, result) {
+  var kg = this;
+  edges.selectAll('circle.delete').remove();
+  setTimeout(function() {
+    edges.append('circle')
+      .classed('delete', true)
+      .attr('r', 3)
+      .style('cursor', 'pointer')
+      .attr('cx', function(d) {
+        return result.edge(d).points[0].x;
+      })
+      .attr('cy', function(d) {
+        return result.edge(d).points[0].y;
+      })
+      .on('click', function(depID) {
+        kg.removeDependency({dependency: depID});
+      });
+  }, kg.config.transitionDuration || 500);
+}
+
 function setupEditing(kg) {
   kg.onEvent('renderGraph', function(e) {
     addConnectionEditing.call(kg, e.graph, e.nodes);
     addChangeableLabels.call(kg, e.graph, e.nodes);
+    addEdgeDeleteButtons.call(kg, e.graph, e.edges, e.result);
   });
 };
 
