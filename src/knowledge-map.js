@@ -219,10 +219,21 @@ var KnowledgeMap = function(api, config) {
       resource = {
         id: resource.toLowerCase().replace(' ', '-'),
         label: resource,
+        type: 'resource',
         content: {},
         teaches: [],
         requires: [],
         needs: []
+      };
+    } else {
+      resource = {
+        id: resource.id || resource.label.toLowerCase().replace(' ', '-'),
+        label: resource.label,
+        type: 'resource',
+        content: resource.content || {},
+        teaches: resource.teaches || [],
+        requires: resource.requires || [],
+        needs: resource.needs || []
       };
     }
 
@@ -263,7 +274,15 @@ var KnowledgeMap = function(api, config) {
       concept = {
         id: concept.toLowerCase().replace(' ', '-'),
         label: concept,
+        type: 'concept',
         content: {}
+      };
+    } else {
+      concept = {
+        id: concept.id || concept.label.toLowerCase().replace(' ', '-'),
+        label: concept.label,
+        type: 'concept',
+        content: concept.content || {}
       };
     }
 
@@ -282,9 +301,12 @@ var KnowledgeMap = function(api, config) {
   Creates node text labels.
   */
   this.defaultNewNodes = function(nodes) {
-    nodes.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('alignment-baseline', 'middle');
+    nodes
+      .classed('concept', function(d) { return 'concept' === d.type })
+      .classed('resource', function(d) { return 'resource' === d.type })
+      .append('text')
+        .attr('text-anchor', 'middle')
+        .attr('alignment-baseline', 'middle');
   };
 
   /*
