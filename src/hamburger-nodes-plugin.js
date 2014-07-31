@@ -9,9 +9,8 @@ var setupHamburgerNodes = function(km) {
       .endAngle(5*Math.PI/2);
 
     // Add enter/above
-    var enter = nodes.insert('path', 'rect')
+    nodes.filter('.resource').insert('path', 'rect')
       .attr('d', semicircle)
-      .classed('enter', true)
       .attr('transform', function(n) {
         return 'translate(0,' + (-10) + ')';
       });
@@ -22,9 +21,9 @@ var setupHamburgerNodes = function(km) {
       .endAngle(3*Math.PI/2);
 
     // Add exit/below
-    var exit = nodes.insert('path', 'rect')
+    nodes.filter('.resource').insert('path', 'rect')
       .attr('d', semicircle)
-      .classed('exit', true)
+      .classed('exit', true);
   });
 
   function getTextHeight() {
