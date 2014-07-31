@@ -176,103 +176,6 @@ function setupSVG(config) {
 }
 
 /*
-Creates the points for the paths that make up the edges
-Offsets the in/out edges to above/below given nodes
-
-Replaces the default dagre-d3 PositionEdgePaths function
-*/
-function positionEdgePaths(g, svgEdgePaths) {
-  // Add an ID to each edge
-  svgEdgePaths
-    .attr('id', function(d) { return d; });
-
-  var interpolate = this._edgeInterpolate,
-      tension = this._edgeTension;
-
-  function calcPoints(e) {
-    var value = g.edge(e);
-    var source = g.node(g.incidentNodes(e)[0]);
-    var target = g.node(g.incidentNodes(e)[1]);
-    var points = value.points.slice();
-
-    var p0 = points.length === 0 ? target : points[0];
-    var p1 = points.length === 0 ? source : points[points.length - 1];
-
-    points.unshift(nodePosition(source, p0));
-    points.push(nodePosition(target, p1));
-
-    return d3.svg.line()
-      .x(function(d) { return d.x; })
-      .y(function(d) { return d.y; })
-      .interpolate(interpolate)
-      .tension(tension)
-      (points);
-  }
-
-  svgEdgePaths.filter('.enter').selectAll('path')
-      .attr('d', calcPoints);
-
-  this._transition(svgEdgePaths.selectAll('path'))
-      .attr('d', calcPoints)
-      .style('opacity', 1);
-}
-
-function nodePosition(node, point) {
-  var x = node.x;
-  var y = node.y;
-  var r = 25;
-  
-  var dx = point.x - x;
-  var dy = point.y - y;
-
-  // Length of the line from the circle to the point
-  var l = Math.sqrt(dx*dx + dy*dy);
-  // Unit values
-  var dxu = dx/l;
-  var dyu = dy/l;
-
-  // Offset above/below depending whether the line is up or down
-  var offset = ((dy > 0) ? 1 : -1) * node.height/4;
-
-  return {x: x + dxu*r, y: y + offset + dyu*r}; 
-}
-
-/*
-Adds entry and exit points for edges into concept elements
-Used in addition to the default node rendering function
-*/
-function drawHamburgers(graph, nodes) {
-  var kg = this;
-
-  // Create a semi-circle path function
-  var semicircle = d3.svg.arc()
-    .outerRadius(20)
-    .startAngle(3*Math.PI/2)
-    .endAngle(5*Math.PI/2);
-
-  // Add enter/above
-  var enter = nodes.insert('path', 'rect')
-    .classed('enter', true)
-    .attr('d', semicircle)
-    .attr('transform', function() {
-      return 'translate(0,' + (-nodes.selectAll('rect').attr('height')/2) + ')';
-    });
-
-  // Flip the semi-circle
-  semicircle
-    .startAngle(Math.PI/2)
-    .endAngle(3*Math.PI/2);
-
-  // Add exit/below
-  var exit = nodes.insert('path', 'rect')
-    .classed('exit', true)
-    .attr('d', semicircle)
-    .attr('transform', function() {
-      return 'translate(0,' + (nodes.selectAll('rect').attr('height')/2) + ')';
-    });
-}
-
-/*
 Construct a knowledge map object.
 
 Accepts a single object:
@@ -428,12 +331,14 @@ var KnowledgeMap = function(api, config) {
   };
 
   /*
-  Sets node text positions.
+  Sets node group positions.
   */
   this.defaultUpdateNodePositions = function(nodes) {
-    nodes.select('text')
-      .attr('x', function(n) { return n.layout.x; })
-      .attr('y', function(n) { return n.layout.y; });
+    nodes.attr('transform', function(n) {
+        var x = n.layout.x;
+        var y = n.layout.y;
+        return 'translate('+ x + ',' + y + ')';
+      });
   };
 
   /*
@@ -447,7 +352,7 @@ var KnowledgeMap = function(api, config) {
   /*
   Positions edge paths.
   */
-  this.defaultUpdateEdges = function(edges) {
+  this.defaultUpdateEdgePositions = function(edges) {
     edges.select('path')
       .attr('d', function(e) {
         var path = e.layout.points.slice();
@@ -491,8 +396,14 @@ var KnowledgeMap = function(api, config) {
     .key(function(d) { return d.id; })
     .make(function(e) { return e.append('g'); })
     .useClass('edgePath')
-    .onNew(this.defaultNewEdges)
-    .onUpdate(this.defaultUpdateEdges);
+    .onNew(this.defaultNewEdges);
+
+  this.positionEdges = new Renderer()
+    .into(this.edgeContainer)
+    .key(function(d) { return d.id; })
+    .make(function(e) { return e.append('g'); })
+    .useClass('edgePath')
+    .onUpdate(this.defaultUpdateEdgePositions);
 
   /*
   Lays out the graph and renders it into the DOM.
@@ -544,6 +455,7 @@ var KnowledgeMap = function(api, config) {
       };
     });
     this.renderEdges.run(edges);
+    this.positionEdges.run(edges);
 
     this.layout = layout;
   };
@@ -651,6 +563,9 @@ var KnowledgeMap = function(api, config) {
       var plugin = config.plugins[i];
       if('string' === typeof(plugin)) {
         plugin = api.plugins[plugin];
+        if(undefined === plugin) {
+          console.error('Plugin \'' + config.plugins[i] + '\' not found!');
+        }
       }
       if(plugin && plugin.run) {
         plugin.run(this);
@@ -684,7 +599,9 @@ var api = {
     return new KnowledgeMap(this, config);
   },
 
-  plugins: {},
+  plugins: {
+    'hamburger-nodes': require('./hamburger-nodes-plugin.js')
+  },
 
   registerPlugin: function(plugin) {
     if(plugin && plugin.name && plugin.run) {

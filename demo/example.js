@@ -56,10 +56,5 @@ var knowledge = {
 // Create graph that visualises the knowledge
 var km = knowledgeMap.create({
   graph: knowledge,
-  plugins: ['modals', {
-    name: 'remove-edges',
-    run: function(km) {
-      //km.renderEdges.offUpdate(km.defaultUpdateEdges);
-    }
-  }],
+  plugins: ['hamburger-nodes'],
 });
