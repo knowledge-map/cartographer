@@ -114,24 +114,16 @@ function intersectRect(rect, point) {
 }
 
 /*
-Given a JSON object with the knowledge data, create a graph object which
-will be rendered by dagre-d3.
-
-json: TODO describe what the json should look like
-*/
-function createGraph(json) {
+ * Create a graph from a config. At the moment, only a list of resources is used
+ * to build the graph.
+ */
+function createGraph(config) {
   this.hold();
-  if (json && json.concepts) {
-    // Add all the concepts as nodes
-    var self = this;
-    json.concepts.forEach(function(concept) {
-      self.addConcept({
-        concept: concept
-      });
-    });
+  if (config && config.resources) {
+    var addResource = this.addResource.bind(this);
+    config.resources.forEach(addResource);
   }
   this.unhold();
-
   return this;
 };
 
@@ -218,99 +210,72 @@ var KnowledgeMap = function(api, config) {
   this.held   = function() { return held; }
 
   /*
-  Adds a concept to the graph and then updates the graph rendering
+   * Resource API
+   */
+  this.addResource = function(resource) {
+    // Just for uniformity of API, allow a single string to create a named
+    // resource. This will never be useful.
+    if('string' === typeof(resource)) {
+      resource = {
+        id: resource.toLowerCase().replace(' ', '-'),
+        label: resource,
+        content: {},
+        teaches: [],
+        requires: [],
+        needs: []
+      };
+    }
 
-  config:
-    concept: The concept object to add
-    dependents: A list of concept ids dependent on this one
-  */
-  this.addConcept = function(config) {
-    var kg = this;
+    // Add the resource to the graph as a node.
+    this.graph.addNode(resource.id, resource);
 
-    // Add node to the graph
-    this.graph.addNode(config.concept.id, {
-      label: config.concept.name,
-      concept: config.concept,
+    // Deal with all the dependencies. Add new concepts and assets where
+    // necessary, and add edges in the appropriate direction.
+    var self = this;
+    var id = resource.id;
+
+    // X-teaches-Y is an arrow from resource X to concept Y.
+    resource.teaches && resource.teaches.forEach(function(c) {
+      var cid = self.defineConcept(c);
+      self.graph.addEdge(id+'-teaches-'+cid, id, cid);
     });
 
-    // Add dependency edges to the graph
-    if (config.concept.dependencies) {
-      config.concept.dependencies.forEach(function(dep) {
-        kg.addDependency({
-          concept: config.concept,
-          dependency: dep,
-        });
-      });
-    }
+    // Y-requires-X is an arrow from concept Y to resource X.
+    resource.requires && resource.requires.forEach(function(c) {
+      var cid = self.defineConcept(c);
+      self.graph.addEdge(id+'-requires-'+cid, cid, id);
+    });
 
-    // Update the graph display
+    resource.needs && resource.needs.forEach(function(a) {
+      //var aid = self.defineAsset(a);
+    });
+
     if(!this.held()) {
       this.render();
     }
+    return id;
   };
 
-  /*
-  Adds a dependency to the graph and then updates the graph rendering
-
-  config:
-    concept: the concept which depends on another concept
-    dependency: the id of the concept which is depended on
-  */
-  this.addDependency = function(config) {
-    // Get ids of the concepts
-    var concept = config.concept;
-    var dep = config.dependency;
-
-    // Add the dependency to the list of the concept's dependencies
-    if (concept.dependencies && concept.dependencies.indexOf(dep) === -1) {
-      concept.dependencies.push(dep);
-    } else {
-      concept.dependencies = [dep];
+  this.defineConcept = function(concept) {
+    var replace = true;
+    if('string' === typeof(concept)) {
+      replace = false;
+      concept = {
+        id: concept.toLowerCase().replace(' ', '-'),
+        label: concept,
+        content: {}
+      };
     }
 
-    // Add the edge to the graph
-    this.graph.addEdge(dep+'-'+concept.id, dep, concept.id);
-
-    // Update the graph display
-    if(!this.held()) {
-      this.render();
+    if(!this.graph.hasNode(concept.id)) {
+      this.graph.addNode(concept.id, concept);
+    } else if(replace) {
+      this.graph.node(concept.id, concept);
+      if(!this.held()) {
+        this.render();
+      }
     }
-  };
-
-  /*
-  Removes a dependency from the graph and then updates the graph rendering
-  */
-  this.removeDependency = function(config) {
-    // Get ids of concepts
-    var con = config.concept;
-    var dep = config.dependency;
-
-    // Remove the dependency from the concept
-    var concept = this.graph.node(con).concept;
-    if (concept.dependencies) {
-      var index = concept.dependencies.indexOf(dep);
-      concept.dependencies.splice(index, 1);
-    }
-
-    // Remove the edge from the graph
-    this.graph.delEdge(dep+'-'+con);
-
-    // Update the graph display
-    if(!this.held()) {
-      this.render();
-    }
-  };
-
-  /*
-  Returns true if the graph has this dependency and false otherwise
-  */
-  this.hasDependency = function(config) {
-    // Get ids of concepts
-    var concept = config.concept;
-    var dep = config.dependency;
-
-    // Return true if edge exists
-    return this.graph.hasEdge(dep+'-'+concept);
+    return concept.id;
   };
 
   /*
@@ -379,7 +344,7 @@ var KnowledgeMap = function(api, config) {
 
   this.renderNodes = new Renderer()
     .into(this.nodeContainer)
-    .key(function(n) { return n.concept.id; })
+    .key(function(n) { return n.id; })
     .make(function(e) { return e.append('g'); })
     .useClass('node')
     .onNew(this.defaultNewNodes)
@@ -387,7 +352,7 @@ var KnowledgeMap = function(api, config) {
 
   this.positionNodes = new Renderer()
     .into(this.nodeContainer)
-    .key(function(n) { return n.concept.id; })
+    .key(function(n) { return n.id; })
     .useClass('node')
     .onUpdate(this.defaultUpdateNodePositions);
 
@@ -441,7 +406,7 @@ var KnowledgeMap = function(api, config) {
 
     // Augment existing node data with layout information.
     this.nodes.forEach(function(node) {
-      node.layout = layout.node(node.concept.id);
+      node.layout = layout.node(node.id);
     });
     this.positionNodes.run(this.nodes);
 
@@ -460,105 +425,12 @@ var KnowledgeMap = function(api, config) {
     this.layout = layout;
   };
 
-  /*
-  Outputs the graph as a JSON object
-  */
-  this.toJSON = function() {
-    var json = {
-      concepts: [],
-    };
-
-    // Add all of the concepts
-    this.graph.eachNode(function(id, node) {
-      json.concepts.push(node.concept);
-    });
-
-    return JSON.stringify(json);
-  };
-  
-  /*
-  Deletes a concept from the graph
-  */
-  this.removeConcept = function(conceptId) {
-    var kg = this;
-    var concept = kg.graph.node(conceptId).concept;
-
-    // Remove all links to concepts that this one depends on
-    if(concept.dependencies) {
-      concept.dependencies.forEach(function(dependency) {
-        kg.removeDependency({
-          concept: conceptId,
-          dependency: dependency,
-        });
-      });
-    }
-
-    // Remove all links to concepts that depend on this
-    var dependants = kg.getDependants(conceptId);
-    if(dependants.length) {
-      dependants.forEach(function(dependant) {
-        kg.removeDependency({
-          concept: dependant,
-          dependency: conceptId,
-        });
-      });
-    }
-
-    // Remove the node
-    kg.graph.delNode(conceptId);
-
-    // Update the display
-    if(!this.held()) {
-      this.render();
-    }
-  };
-
-  /*
-  Return a list of IDs of concepts that depend on a given concept, i.e.
-  have this concept as a dependency
-  */
-  this.getDependants = function(conceptId) {
-    return this.graph.successors(conceptId);
-  };
-
-  /*
-  Add a piece of content to a concept
-  */
-  this.addContent = function(conceptId, content) {
-    var concept = this.graph.node(conceptId).concept;
-    if(concept.content) {
-      concept.content.push(content);
-    } else {
-      concept.content = [content];
-    }
-  };
-
-  /*
-  Update a piece of content in a concept
-  */
-  this.updateContent = function(conceptId, contentIndex, content) {
-    var concept = this.graph.node(conceptId).concept;
-    if(contentIndex >= concept.content.length) {
-      this.addContent(conceptId, content);
-    } else {
-      concept.content[contentIndex] = content;
-    }
-  };
-
-  /*
-  Remove a piece of content from a concept
-  */
-  this.removeContent = function(conceptId, contentIndex) {
-    var concept = this.graph.node(conceptId).concept;
-    concept.content.splice(contentIndex, 1);
-  };
-
   // Create the directed graph
   this.graph = new dagre.Digraph();
-  createGraph.call(this, config.graph);
+  createGraph.call(this, config);
 
   // Initialise plugins.
-  if(config && config.plugins) {
+  if(config.plugins) {
     for(var i = 0; i < config.plugins.length; i++) {
       var plugin = config.plugins[i];
       if('string' === typeof(plugin)) {
