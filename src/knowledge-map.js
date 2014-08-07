@@ -346,6 +346,7 @@ var KnowledgeMap = function(api, config) {
     nodes
       .classed('concept', function(d) { return 'concept' === d.type })
       .classed('resource', function(d) { return 'resource' === d.type })
+      .attr('id', function(n) { return n.id; })
       .append('text')
         .attr('text-anchor', 'middle')
         .attr('alignment-baseline', 'middle');
