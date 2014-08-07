@@ -145,8 +145,10 @@ function intersectRect(rect, point) {
 function createGraph(config) {
   this.hold();
   if (config && config.resources) {
-    var addResource = this.addResource.bind(this);
-    config.resources.forEach(addResource);
+    var self = this;
+    config.resources.forEach(function(r) {
+      self.addResource(r);
+    });
   }
   this.unhold();
   return this;
@@ -308,6 +310,41 @@ var KnowledgeMap = function(api, config) {
 
     this.render();
     return id;
+  };
+
+  this.removeResource = function(resourceId) {
+    if('string' !== typeof(resourceId)) {
+      resourceId = resourceId.id;
+    }
+
+    if(this.graph.hasNode(resourceId)) {
+      // Remove resource node and all edges.
+      var resource = this.graph.node(resourceId);
+      this.graph.delNode(resourceId);
+
+      // Remove concept nodes with no more incident edges.
+      var self = this;
+      var remove = function(id) {
+        if('string' !== typeof(id)) {
+          id = id.id;
+        }
+        if(!self.graph.incidentEdges(id).length) {
+          self.graph.delNode(id);
+        }
+      };
+      if(resource.teaches) {
+        resource.teaches.forEach(function(c) {
+          remove(c);
+        });
+      }
+      if(resource.requires) {
+        resource.requires.forEach(function(c) {
+          remove(c);
+        });
+      }
+    }
+
+    this.render();
   };
 
   this.defineConcept = function(concept) {
