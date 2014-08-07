@@ -3,7 +3,33 @@
 var d3 = require('d3');
 var dagre = require('dagre');
 
+/**
+ Call this on an object to define a 'callback' handler with lots of boilerplate
+ functionality taken care of. There will be three new methods on this object,
+ where Name is the name you give the callback:
+
+   doName - calls all the callback handlers assigned to this callback, passing
+            them the arguments passed to it.
+   onName - registers a handler for this callback.
+   offName - removes a callback handler for this callback.
+
+ For example:
+
+  var myObject = {callbacks: []};
+  callback.call(myObject, 'update');
+  var updateHandler = function(arg) {
+    console.log('Object updated and says: ' + arg);
+  };
+  myObject.onUpdate(updateHandler);
+  myObject.doUpdate('hello!');
+  myObject.offUpdate(updateHandler);
+  myObject.doUpdate('you won't see this!');
+
+ */
 function callback(name) {
+  if(!this.callbacks) {
+    this.callbacks = {};
+  }
   this.callbacks[name] = [];
   var capName = name[0].toUpperCase() + name.slice(1);
 
@@ -40,8 +66,6 @@ function property(store, access) {
 }
 
 function Renderer() {
-  this.callbacks = {};
-
   callback.call(this, 'new');
   callback.call(this, 'update');
 
@@ -158,9 +182,23 @@ function setupSVG(config) {
 
   // Make zoomable.
   var el = this.element = root.append('g');
-  root.call(d3.behavior.zoom().scaleExtent([0.3, 1]).on("zoom", function () {
-      el.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
-    }));
+  var self = this;
+
+  callback.call(this, 'zoom');
+  callback.call(this, 'zoomSetup');
+  this.zoom = d3.behavior.zoom();
+  root.call(this.zoom.on("zoom", function () {
+    self.doZoom(this.zoom);
+  }));
+
+  this.defaultZoomSetup = function(zoom) {
+    zoom.scaleExtent([0.3, 1]);
+  };
+  this.onZoomSetup(this.defaultZoomSetup);
+  this.defaultOnZoom = function() {
+    el.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+  };
+  this.onZoom(this.defaultOnZoom);
 
   // Groups for node and edge SVG elements.
   this.edgeContainer = this.element.append('g').classed('edges', true);

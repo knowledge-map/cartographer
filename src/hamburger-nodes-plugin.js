@@ -13,7 +13,8 @@ var setupHamburgerNodes = function(km) {
       .attr('d', semicircle)
       .classed('enter', true)
       .attr('transform', function(n) {
-        return 'translate(0,' + (-10) + ')';
+        var height = getTextHeight.call(this);
+        return 'translate(0,' + (-height) + ')';
       });
 
     // Flip the semi-circle
@@ -24,7 +25,11 @@ var setupHamburgerNodes = function(km) {
     // Add exit/below
     nodes.filter('.resource').insert('path', 'rect')
       .attr('d', semicircle)
-      .classed('exit', true);
+      .classed('exit', true)
+      .attr('transform', function(n) {
+        var height = getTextHeight.call(this);
+        return 'translate(0,' + (height) + ')';
+      });
   });
 
   function getTextHeight() {
