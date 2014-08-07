@@ -299,9 +299,7 @@ var KnowledgeMap = function(api, config) {
       //var aid = self.defineAsset(a);
     });
 
-    if(!this.held()) {
-      this.render();
-    }
+    this.render();
     return id;
   };
 
@@ -326,11 +324,10 @@ var KnowledgeMap = function(api, config) {
 
     if(!this.graph.hasNode(concept.id)) {
       this.graph.addNode(concept.id, concept);
+      this.render();
     } else if(replace) {
       this.graph.node(concept.id, concept);
-      if(!this.held()) {
-        this.render();
-      }
+      this.render();
     }
     return concept.id;
   };
@@ -434,6 +431,9 @@ var KnowledgeMap = function(api, config) {
   Lays out the graph and renders it into the DOM.
   */
   this.render = function() {
+    if(this.held()) {
+      return;
+    }
     var self = this;
 
     // Instead of a list of IDs, our data should be a list of objects.
@@ -510,9 +510,7 @@ var KnowledgeMap = function(api, config) {
   }
 
   // Display the graph
-  if(!this.held()) {
-    this.render();
-  }
+  this.render();
 
   return this;
 };
