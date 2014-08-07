@@ -23,7 +23,11 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     config.cache.scope = :box
   end  
 
-  config.vm.provision :shell, :path => "vm/provision.sh"
+  config.vm.provision :shell, :path => "tools/vagrant/provision.sh"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.gui = false
+  end
 
   # Create a forwarded port mapping which allows access to a specific port
   # within the machine from a port on the host machine. In the example below,

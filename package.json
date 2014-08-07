@@ -23,6 +23,7 @@
   },
   "scripts": {
     "git-setup": "tools/gitsetup",
+    "vagrant-setup": "tools/vagrantsetup",
     "build-js": "node tools/build.js",
     "build-css": "cat src/css/* | lessc --include-path=src/css - dist/css/knowledge-map.css",
     "build": "npm run build-js & npm run build-css",
