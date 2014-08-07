@@ -57,7 +57,12 @@ var km = knowledgeMap.create({
   plugins: ['hamburger-nodes'],
 });
 
+km.onPreLayout(function(config) {
+  config.rankSep(75);
+});
+km.render();
+
 km.defineConcept({
-  id: 'what-is-a-km',
+  id: 'what-a-knowledge-map-is',
   label: 'Blah!'
 });
