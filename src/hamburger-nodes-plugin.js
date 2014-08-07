@@ -11,6 +11,7 @@ var setupHamburgerNodes = function(km) {
     // Add enter/above
     nodes.filter('.resource').insert('path', 'rect')
       .attr('d', semicircle)
+      .classed('enter', true)
       .attr('transform', function(n) {
         return 'translate(0,' + (-10) + ')';
       });
