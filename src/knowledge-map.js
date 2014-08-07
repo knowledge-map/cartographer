@@ -85,10 +85,11 @@ function Renderer() {
     var rowData = rows.data(data, this.rowKey);
     rowData.exit().remove();
 
+    var newRows;
     if(this.makeRows) {
-      var newRows = this.makeRows(rowData.enter());
+      newRows = this.makeRows(rowData.enter());
     } else if(this.cls) {
-      var newRows = rowData.enter().select(this.cls);
+      newRows = rowData.enter().select(this.cls);
     } else {
       error('makeColumn did not return a selection');
     }
@@ -99,7 +100,7 @@ function Renderer() {
 
     return {data: rowData, enter: newRows};
   };
-};
+}
 
 /*
 Rectangle intersection from dagre-d3 source.
@@ -149,7 +150,7 @@ function createGraph(config) {
   }
   this.unhold();
   return this;
-};
+}
 
 function setupSVG(config) {
   // Create elements on the page for us to render our graph in
@@ -284,20 +285,26 @@ var KnowledgeMap = function(api, config) {
     var id = resource.id;
 
     // X-teaches-Y is an arrow from resource X to concept Y.
-    resource.teaches && resource.teaches.forEach(function(c) {
-      var cid = self.defineConcept(c);
-      self.graph.addEdge(id+'-teaches-'+cid, id, cid);
-    });
+    if(resource.teaches) {
+      resource.teaches.forEach(function(c) {
+        var cid = self.defineConcept(c);
+        self.graph.addEdge(id+'-teaches-'+cid, id, cid);
+      });
+    }
 
     // Y-requires-X is an arrow from concept Y to resource X.
-    resource.requires && resource.requires.forEach(function(c) {
-      var cid = self.defineConcept(c);
-      self.graph.addEdge(id+'-requires-'+cid, cid, id);
-    });
+    if(resource.requires) {
+      resource.requires.forEach(function(c) {
+        var cid = self.defineConcept(c);
+        self.graph.addEdge(id+'-requires-'+cid, cid, id);
+      });
+    }
 
-    resource.needs && resource.needs.forEach(function(a) {
-      //var aid = self.defineAsset(a);
-    });
+    if(resource.needs) {
+      resource.needs.forEach(function(a) {
+        //var aid = self.defineAsset(a);
+      });
+    }
 
     this.render();
     return id;
