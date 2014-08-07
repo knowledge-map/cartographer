@@ -430,6 +430,8 @@ var KnowledgeMap = function(api, config) {
   /*
   Lays out the graph and renders it into the DOM.
   */
+  callback.call(this, 'preLayout');
+  callback.call(this, 'postLayout');
   this.render = function() {
     if(this.held()) {
       return;
@@ -449,11 +451,10 @@ var KnowledgeMap = function(api, config) {
     });
 
     // Generate a graph layout and render it.
-    var layout = dagre.layout().run(this.graph);
-    this.postEvent({
-      type: 'preLayout',
-      layout: layout,
-    });
+    var config = dagre.layout();
+    this.doPreLayout(config);
+    var layout = config.run(this.graph);
+    this.doPostLayout(layout);
     this.provideLayout(layout);
   };
 
