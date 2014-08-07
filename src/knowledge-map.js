@@ -518,6 +518,9 @@ var KnowledgeMap = function(api, config) {
     this.__defineSetter__('plugins', function() {});
   }
 
+  // Callbacks for plugins to respond to.
+  this.doZoomSetup(this.zoom);
+
   // Display the graph
   this.render();
 
