@@ -255,7 +255,7 @@ var KnowledgeMap = function(api, config) {
     // resource. This will never be useful.
     if('string' === typeof(resource)) {
       resource = {
-        id: resource.toLowerCase().replace(' ', '-'),
+        id: resource.toLowerCase().replace(/ /g, '-'),
         label: resource,
         type: 'resource',
         content: {},
@@ -265,7 +265,7 @@ var KnowledgeMap = function(api, config) {
       };
     } else {
       resource = {
-        id: resource.id || resource.label.toLowerCase().replace(' ', '-'),
+        id: resource.id || resource.label.toLowerCase().replace(/ /g, '-'),
         label: resource.label,
         type: 'resource',
         content: resource.content || {},
@@ -308,14 +308,14 @@ var KnowledgeMap = function(api, config) {
     if('string' === typeof(concept)) {
       replace = false;
       concept = {
-        id: concept.toLowerCase().replace(' ', '-'),
+        id: concept.toLowerCase().replace(/ /g, '-'),
         label: concept,
         type: 'concept',
         content: {}
       };
     } else {
       concept = {
-        id: concept.id || concept.label.toLowerCase().replace(' ', '-'),
+        id: concept.id || concept.label.toLowerCase().replace(/ /g, '-'),
         label: concept.label,
         type: 'concept',
         content: concept.content || {}
