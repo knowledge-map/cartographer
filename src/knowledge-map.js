@@ -222,30 +222,9 @@ var KnowledgeMap = function(api, config) {
   config = config || {};
 
   /*
-  Message API
-  */
-  this.dispatcher = {};
-
-  this.postEvent = function(e) {
-    if(this.dispatcher[e.type]) {
-      var callbacks = this.dispatcher[e.type];
-      callbacks.forEach(function(callback) {
-        callback(e);
-      });
-    }
-  };
-
-  this.onEvent = function(type, callback) {
-    if(undefined === this.dispatcher[type]) {
-      this.dispatcher[type] = [];
-    }
-    this.dispatcher[type].push(callback);
-  };
-
-  /*
   Hold API
   */
-  var held    = (!!config.held) ? true : false;
+  var held    = !!config.held;
   this.hold   = function() { held = true; return this; }
   this.unhold = function() { held = false; return this; }
   this.held   = function() { return held; }
@@ -340,6 +319,12 @@ var KnowledgeMap = function(api, config) {
     this.render();
   };
 
+  /**
+   Define a concept object that will be included in the graph. If a string is
+   passed, a new concept object will be created. The string is treated as the
+   label of the concept, and converted into a correct ID. If an object is passed,
+   the object will replace the contents of any existing concept with the same ID.
+  */
   this.defineConcept = function(concept) {
     var replace = true;
     if('string' === typeof(concept)) {
@@ -533,15 +518,26 @@ var KnowledgeMap = function(api, config) {
     for(var i = 0; i < config.plugins.length; i++) {
       var plugin = config.plugins[i];
       if('string' === typeof(plugin)) {
+        // If we're just given a name, check the registry for an existing plugin.
         plugin = api.plugins[plugin];
         if(undefined === plugin) {
           console.error('Plugin \'' + config.plugins[i] + '\' not found!');
         }
       }
-      if(plugin && plugin.run) {
+      if(typeof plugin === 'function') {
+        // If we're provided with a raw function, just run it.
+        plugin(this);
+      }
+      else if(plugin && plugin.run) {
+        // If we have an object with a run member, treat it as a new plugin to
+        // be defined. Add it to the registry if necessary, and run it.
+        if(plugin.name) {
+          api.plugins[plugin.name] = plugin;
+        }
         plugin.run(this);
       }
     }
+
     this.__defineGetter__('plugins', function() {
       return config.plugins;
     });
