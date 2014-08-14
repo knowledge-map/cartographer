@@ -1,759 +1,112 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-/**
- * Copyright (c) 2012 James Frasca
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function (global){
+"use strict";
+
+var d3 = require('d3');
+var dagre = require('dagre');
 
 /**
- * A self-contained modal library
+ Call this on an object to define a 'callback' handler with lots of boilerplate
+ functionality taken care of. There will be three new methods on this object,
+ where Name is the name you give the callback:
+
+   doName - calls all the callback handlers assigned to this callback, passing
+            them the arguments passed to it.
+   onName - registers a handler for this callback.
+   offName - removes a callback handler for this callback.
+
+ For example:
+
+  var myObject = {callbacks: []};
+  callback.call(myObject, 'update');
+  var updateHandler = function(arg) {
+    console.log('Object updated and says: ' + arg);
+  };
+  myObject.onUpdate(updateHandler);
+  myObject.doUpdate('hello!');
+  myObject.offUpdate(updateHandler);
+  myObject.doUpdate('you won't see this!');
+
  */
-!function (name, definition) {
+function callback(name) {
+  if(!this.callbacks) {
+    this.callbacks = {};
+  }
+  this.callbacks[name] = [];
+  var capName = name[0].toUpperCase() + name.slice(1);
 
-    if (typeof module != 'undefined') module.exports = definition()
-    else if (typeof define == 'function' && typeof define.amd == 'object') define(definition)
-    else this[name] = definition()
+  this['do' + capName] = function() {
+    var args = Array.prototype.slice.call(arguments);
+    var self = this;
+    this.callbacks[name].forEach(function(cb) { cb.apply(self, args); });
+  };
 
-}('picoModal', function () {
+  this['on' + capName] = function(cb) {
+    this.callbacks[name].push(cb);
+    return this;
+  };
 
-    var picoModal = (function(window, document) {
-        "use strict";
+  this['off' + capName] = function(cb) {
+    var idx = this.callbacks[name].indexOf(cb);
+    if(-1 !== idx) {
+      this.callbacks[name].splice(idx, 1);
+    }
+    return this;
+  };
+}
 
-        // Generates observable objects that can be watched and triggered
-        var observable = function() {
-            var callbacks = [];
-            return {
-                watch: function(callback) {
-                           callbacks.push(callback);
-                       },
-        trigger: function() {
-                     for (var i = 0; i < callbacks.length; i++) {
-                         window.setTimeout(callbacks[i], 1);
-                     }
-                 }
-            };
-        };
-
-        // A small interface for creating and managing a dom element
-        var make = function( parent ) {
-
-            var elem = document.createElement('div');
-            (parent || document.body).appendChild(elem);
-
-            var iface = {
-
-                elem: elem,
-
-                // Creates a child of this node
-                child: function () {
-                    return make(elem);
-                },
-
-                // Applies a set of styles to an element
-                stylize: function(styles) {
-                             styles = styles || {};
-
-                             if ( typeof styles.opacity !== "undefined" ) {
-                                 styles.filter =
-                                     "alpha(opacity=" + (styles.opacity * 100) + ")";
-                             }
-
-                             for (var prop in styles) {
-                                 if (styles.hasOwnProperty(prop)) {
-                                     elem.style[prop] = styles[prop];
-                                 }
-                             }
-
-                             return iface;
-                         },
-
-                // Adds a class name
-                clazz: function (clazz) {
-                           elem.className += clazz;
-                           return iface;
-                       },
-
-                // Sets the HTML
-                html: function (content) {
-                          elem.innerHTML = content;
-                          return iface;
-                      },
-
-                // Returns the width of this element
-                getWidth: function () {
-                              return elem.clientWidth;
-                          },
-
-                // Adds a click handler to this element
-                onClick: function(callback) {
-                             if (elem.attachEvent) {
-                                 elem.attachEvent('onclick', callback);
-                             }
-                             else {
-                                 elem.addEventListener('click', callback);
-                             }
-
-                             return iface;
-                         },
-
-                // Removes this element from the DOM
-                destroy: function() {
-                             document.body.removeChild(elem);
-                             return iface;
-                         }
-
-            };
-
-            return iface;
-        };
-
-        // An interface for generating the grey-out effect
-        var overlay = function( getOption ) {
-
-            // The registered on click events
-            var clickCallbacks = observable();
-
-            // The overlay element
-            var elem = make()
-                .clazz("pico-overlay")
-                .stylize({
-                    display: "block",
-                    position: "fixed",
-                    top: "0px",
-                    left: "0px",
-                    height: "100%",
-                    width: "100%",
-                    zIndex: 10000
-                })
-            .stylize( getOption('overlayStyles', {
-                opacity: 0.5,
-                background: "#000"
-            }) )
-            .onClick(clickCallbacks.trigger);
-
-            return {
-                elem: elem.elem,
-                    destroy: elem.destroy,
-                    onClick: clickCallbacks.watch
-            };
-        };
-
-        // A function for easily displaying a modal with the given content
-        return function(options) {
-
-            if ( typeof options === "string" ) {
-                options = { content: options };
-            }
-
-            // Returns a named option if it has been explicitly defined. Otherwise,
-            // it returns the given default value
-            function getOption ( opt, defaultValue ) {
-                return options[opt] === void(0) ? defaultValue : options[opt];
-            }
-
-            var shadow = overlay( getOption );
-
-            var closeCallbacks = observable();
-
-            var elem = make()
-                .clazz("pico-content")
-                .stylize({
-                    display: 'block',
-                    position: 'fixed',
-                    zIndex: 10001,
-                    left: "50%",
-                    top: "50px"
-                })
-            .html(options.content);
-
-            var width = getOption('width', elem.getWidth());
-
-            elem
-                .stylize({
-                    width: width + "px",
-                    margin: "0 0 0 " + (-(width / 2) + "px")
-                })
-            .stylize( getOption('modalStyles', {
-                backgroundColor: "white",
-                padding: "20px",
-                borderRadius: "5px"
-            }) );
-
-            var close = function () {
-                closeCallbacks.trigger();
-                shadow.destroy();
-                elem.destroy();
-            };
-
-            if ( getOption('overlayClose', true) ) {
-                shadow.onClick(close);
-            }
-
-            var closeButton;
-            if ( getOption('closeButton', true) ) {
-                closeButton = elem.child()
-                    .html( getOption('closeHtml', "&#xD7;") )
-                    .clazz("pico-close")
-                    .stylize( getOption('closeStyles', {
-                        borderRadius: "2px",
-                        cursor: "pointer",
-                        height: "15px",
-                        width: "15px",
-                        position: "absolute",
-                        top: "5px",
-                        right: "5px",
-                        fontSize: "16px",
-                        textAlign: "center",
-                        lineHeight: "15px",
-                        background: "#CCC"
-                    }) )
-                .onClick(close);
-            }
-
-            return {
-                modalElem: elem.elem,
-                closeElem: closeButton ? closeButton.elem : null,
-                overlayElem: shadow.elem,
-                close: close,
-                onClose: closeCallbacks.watch
-            };
-        };
-
-    }(window, document));
-
-    return picoModal;
-
-});
-
-},{}],2:[function(require,module,exports){
-
-},{}],3:[function(require,module,exports){
-/**
- * @license
- * Copyright (c) 2012-2013 Chris Pettitt
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-module.exports =  {
-  Digraph: require('graphlib').Digraph,
-  Renderer: require('./lib/Renderer'),
-  json: require('graphlib').converter.json,
-  layout: require('dagre').layout,
-  version: require('./lib/version')
-};
-
-},{"./lib/Renderer":4,"./lib/version":5,"dagre":11,"graphlib":28}],4:[function(require,module,exports){
-var layout = require('dagre').layout;
-
-var d3;
-try { d3 = require('d3'); } catch (_) { d3 = window.d3; }
-
-module.exports = Renderer;
+function property(store, access) {
+  this[store] = undefined;
+  this[access] = function(val) {
+    if(undefined === val) {
+      return this[store];
+    } else {
+      this[store] = val;
+      return this;
+    }
+  };
+}
 
 function Renderer() {
-  // Set up defaults...
-  this._layout = layout();
+  callback.call(this, 'new');
+  callback.call(this, 'update');
 
-  this.drawNodes(defaultDrawNodes);
-  this.drawEdgeLabels(defaultDrawEdgeLabels);
-  this.drawEdgePaths(defaultDrawEdgePaths);
-  this.positionNodes(defaultPositionNodes);
-  this.positionEdgeLabels(defaultPositionEdgeLabels);
-  this.positionEdgePaths(defaultPositionEdgePaths);
-  this.zoomSetup(defaultZoomSetup);
-  this.zoom(defaultZoom);
-  this.transition(defaultTransition);
-  this.postLayout(defaultPostLayout);
-  this.postRender(defaultPostRender);
+  property.call(this, '_into', 'into');
+  property.call(this, 'cls', 'useClass');
+  property.call(this, 'rowKey', 'key');
+  property.call(this, 'makeRows', 'make');
 
-  this.edgeInterpolate('bundle');
-  this.edgeTension(0.95);
-}
-
-Renderer.prototype.layout = function(layout) {
-  if (!arguments.length) { return this._layout; }
-  this._layout = layout;
-  return this;
-};
-
-Renderer.prototype.drawNodes = function(drawNodes) {
-  if (!arguments.length) { return this._drawNodes; }
-  this._drawNodes = bind(drawNodes, this);
-  return this;
-};
-
-Renderer.prototype.drawEdgeLabels = function(drawEdgeLabels) {
-  if (!arguments.length) { return this._drawEdgeLabels; }
-  this._drawEdgeLabels = bind(drawEdgeLabels, this);
-  return this;
-};
-
-Renderer.prototype.drawEdgePaths = function(drawEdgePaths) {
-  if (!arguments.length) { return this._drawEdgePaths; }
-  this._drawEdgePaths = bind(drawEdgePaths, this);
-  return this;
-};
-
-Renderer.prototype.positionNodes = function(positionNodes) {
-  if (!arguments.length) { return this._positionNodes; }
-  this._positionNodes = bind(positionNodes, this);
-  return this;
-};
-
-Renderer.prototype.positionEdgeLabels = function(positionEdgeLabels) {
-  if (!arguments.length) { return this._positionEdgeLabels; }
-  this._positionEdgeLabels = bind(positionEdgeLabels, this);
-  return this;
-};
-
-Renderer.prototype.positionEdgePaths = function(positionEdgePaths) {
-  if (!arguments.length) { return this._positionEdgePaths; }
-  this._positionEdgePaths = bind(positionEdgePaths, this);
-  return this;
-};
-
-Renderer.prototype.transition = function(transition) {
-  if (!arguments.length) { return this._transition; }
-  this._transition = bind(transition, this);
-  return this;
-};
-
-Renderer.prototype.zoomSetup = function(zoomSetup) {
-  if (!arguments.length) { return this._zoomSetup; }
-  this._zoomSetup = bind(zoomSetup, this);
-  return this;
-};
-
-Renderer.prototype.zoom = function(zoom) {
-  if (!arguments.length) { return this._zoom; }
-  this._zoom = bind(zoom, this);
-  return this;
-};
-
-Renderer.prototype.postLayout = function(postLayout) {
-  if (!arguments.length) { return this._postLayout; }
-  this._postLayout = bind(postLayout, this);
-  return this;
-};
-
-Renderer.prototype.postRender = function(postRender) {
-  if (!arguments.length) { return this._postRender; }
-  this._postRender = bind(postRender, this);
-  return this;
-};
-
-Renderer.prototype.edgeInterpolate = function(edgeInterpolate) {
-  if (!arguments.length) { return this._edgeInterpolate; }
-  this._edgeInterpolate = edgeInterpolate;
-  return this;
-};
-
-Renderer.prototype.edgeTension = function(edgeTension) {
-  if (!arguments.length) { return this._edgeTension; }
-  this._edgeTension = edgeTension;
-  return this;
-};
-
-Renderer.prototype.run = function(graph, svg) {
-  // First copy the input graph so that it is not changed by the rendering
-  // process.
-  graph = copyAndInitGraph(graph);
-
-  // Create zoom elements
-  svg = this._zoomSetup(graph, svg);
-
-  // Create layers
-  svg
-    .selectAll('g.edgePaths, g.edgeLabels, g.nodes')
-    .data(['edgePaths', 'edgeLabels', 'nodes'])
-    .enter()
-      .append('g')
-      .attr('class', function(d) { return d; });
-
-  // Create node and edge roots, attach labels, and capture dimension
-  // information for use with layout.
-  var svgNodes = this._drawNodes(graph, svg.select('g.nodes'));
-  var svgEdgeLabels = this._drawEdgeLabels(graph, svg.select('g.edgeLabels'));
-
-  svgNodes.each(function(u) { calculateDimensions(this, graph.node(u)); });
-  svgEdgeLabels.each(function(e) { calculateDimensions(this, graph.edge(e)); });
-
-  // Now apply the layout function
-  var result = runLayout(graph, this._layout);
-
-  // Run any user-specified post layout processing
-  this._postLayout(result, svg);
-
-  var svgEdgePaths = this._drawEdgePaths(graph, svg.select('g.edgePaths'));
-
-  // Apply the layout information to the graph
-  this._positionNodes(result, svgNodes);
-  this._positionEdgeLabels(result, svgEdgeLabels);
-  this._positionEdgePaths(result, svgEdgePaths);
-
-  this._postRender(result, svg);
-
-  return result;
-};
-
-function copyAndInitGraph(graph) {
-  var copy = graph.copy();
-
-  // Init labels if they were not present in the source graph
-  copy.nodes().forEach(function(u) {
-    var value = copy.node(u);
-    if (value === undefined) {
-      value = {};
-      copy.node(u, value);
+  this.run = function (data) {
+    function error(message) {
+      throw message;
     }
-    if (!('label' in value)) { value.label = ''; }
-  });
 
-  copy.edges().forEach(function(e) {
-    var value = copy.edge(e);
-    if (value === undefined) {
-      value = {};
-      copy.edge(e, value);
+    var row = this.cls || 'km-row';
+
+    var rows = this.into().selectAll('.' + row);
+    var rowData = rows.data(data, this.rowKey);
+    rowData.exit().remove();
+
+    var newRows;
+    if(this.makeRows) {
+      newRows = this.makeRows(rowData.enter());
+    } else if(this.cls) {
+      newRows = rowData.enter().select(this.cls);
+    } else {
+      error('makeColumn did not return a selection');
     }
-    if (!('label' in value)) { value.label = ''; }
-  });
+    newRows.classed(row, true);
 
-  return copy;
+    this.doNew(newRows);
+    this.doUpdate(rowData);
+
+    return {data: rowData, enter: newRows};
+  };
 }
 
-function calculateDimensions(group, value) {
-  var bbox = group.getBBox();
-  value.width = bbox.width;
-  value.height = bbox.height;
-}
-
-function runLayout(graph, layout) {
-  var result = layout.run(graph);
-
-  // Copy labels to the result graph
-  graph.eachNode(function(u, value) { result.node(u).label = value.label; });
-  graph.eachEdge(function(e, u, v, value) { result.edge(e).label = value.label; });
-
-  return result;
-}
-
-function defaultDrawNodes(g, root) {
-  var nodes = g.nodes().filter(function(u) { return !isComposite(g, u); });
-
-  var svgNodes = root
-    .selectAll('g.node')
-    .classed('enter', false)
-    .data(nodes, function(u) { return u; });
-
-  svgNodes.selectAll('*').remove();
-
-  svgNodes
-    .enter()
-      .append('g')
-        .style('opacity', 0)
-        .attr('class', 'node enter');
-
-  svgNodes.each(function(u) { addLabel(g.node(u), d3.select(this), 10, 10); });
-
-  this._transition(svgNodes.exit())
-      .style('opacity', 0)
-      .remove();
-
-  return svgNodes;
-}
-
-function defaultDrawEdgeLabels(g, root) {
-  var svgEdgeLabels = root
-    .selectAll('g.edgeLabel')
-    .classed('enter', false)
-    .data(g.edges(), function (e) { return e; });
-
-  svgEdgeLabels.selectAll('*').remove();
-
-  svgEdgeLabels
-    .enter()
-      .append('g')
-        .style('opacity', 0)
-        .attr('class', 'edgeLabel enter');
-
-  svgEdgeLabels.each(function(e) { addLabel(g.edge(e), d3.select(this), 0, 0); });
-
-  this._transition(svgEdgeLabels.exit())
-      .style('opacity', 0)
-      .remove();
-
-  return svgEdgeLabels;
-}
-
-var defaultDrawEdgePaths = function(g, root) {
-  var svgEdgePaths = root
-    .selectAll('g.edgePath')
-    .classed('enter', false)
-    .data(g.edges(), function(e) { return e; });
-
-  svgEdgePaths
-    .enter()
-      .append('g')
-        .attr('class', 'edgePath enter')
-        .append('path')
-          .style('opacity', 0)
-          .attr('marker-end', 'url(#arrowhead)');
-
-  this._transition(svgEdgePaths.exit())
-      .style('opacity', 0)
-      .remove();
-
-  return svgEdgePaths;
-};
-
-function defaultPositionNodes(g, svgNodes) {
-  function transform(u) {
-    var value = g.node(u);
-    return 'translate(' + value.x + ',' + value.y + ')';
-  }
-
-  // For entering nodes, position immediately without transition
-  svgNodes.filter('.enter').attr('transform', transform);
-
-  this._transition(svgNodes)
-      .style('opacity', 1)
-      .attr('transform', transform);
-}
-
-function defaultPositionEdgeLabels(g, svgEdgeLabels) {
-  function transform(e) {
-    var value = g.edge(e);
-    var point = findMidPoint(value.points);
-    return 'translate(' + point.x + ',' + point.y + ')';
-  }
-
-  // For entering edge labels, position immediately without transition
-  svgEdgeLabels.filter('.enter').attr('transform', transform);
-
-  this._transition(svgEdgeLabels)
-    .style('opacity', 1)
-    .attr('transform', transform);
-}
-
-function defaultPositionEdgePaths(g, svgEdgePaths) {
-  var interpolate = this._edgeInterpolate,
-      tension = this._edgeTension;
-
-  function calcPoints(e) {
-    var value = g.edge(e);
-    var source = g.node(g.incidentNodes(e)[0]);
-    var target = g.node(g.incidentNodes(e)[1]);
-    var points = value.points.slice();
-
-    var p0 = points.length === 0 ? target : points[0];
-    var p1 = points.length === 0 ? source : points[points.length - 1];
-
-    points.unshift(intersectRect(source, p0));
-    // TODO: use bpodgursky's shortening algorithm here
-    points.push(intersectRect(target, p1));
-
-    return d3.svg.line()
-      .x(function(d) { return d.x; })
-      .y(function(d) { return d.y; })
-      .interpolate(interpolate)
-      .tension(tension)
-      (points);
-  }
-
-  svgEdgePaths.filter('.enter').selectAll('path')
-      .attr('d', calcPoints);
-
-  this._transition(svgEdgePaths.selectAll('path'))
-      .attr('d', calcPoints)
-      .style('opacity', 1);
-}
-
-// By default we do not use transitions
-function defaultTransition(selection) {
-  return selection;
-}
-
-// Setup dom for zooming
-function defaultZoomSetup(graph, svg) {
-  if (svg.select('rect.overlay').empty()) {
-    // Create an overlay for capturing mouse events that don't touch foreground
-    svg.append('rect')
-      .attr('class', 'overlay')
-      .attr('width', '100%')
-      .attr('height', '100%')
-      .style('fill', 'none')
-      .style('pointer-events', 'all');
-
-    // Capture the zoom behaviour from the svg
-    containerSvg = svg;
-    svg = svg.append('g')
-      .attr('class', 'zoom');
-    containerSvg.call(this._zoom(graph, svg));
-  }
-
-  return svg;
-}
-
-// By default allow pan and zoom
-function defaultZoom(graph, svg) {
-  return d3.behavior.zoom().on('zoom', function() {
-    svg.attr('transform', 'translate(' + d3.event.translate + ')scale(' + d3.event.scale + ')');
-  });
-}
-
-function defaultPostLayout() {
-  // Do nothing
-}
-
-function defaultPostRender(graph, root) {
-  if (graph.isDirected() && root.select('#arrowhead').empty()) {
-    root
-      .append('svg:defs')
-        .append('svg:marker')
-          .attr('id', 'arrowhead')
-          .attr('viewBox', '0 0 10 10')
-          .attr('refX', 8)
-          .attr('refY', 5)
-          .attr('markerUnits', 'strokewidth')
-          .attr('markerWidth', 8)
-          .attr('markerHeight', 5)
-          .attr('orient', 'auto')
-          .attr('style', 'fill: #333')
-          .append('svg:path')
-            .attr('d', 'M 0 0 L 10 5 L 0 10 z');
-  }
-}
-
-function addLabel(node, root, marginX, marginY) {
-  // Add the rect first so that it appears behind the label
-  var label = node.label;
-  var rect = root.append('rect');
-  var labelSvg = root.append('g');
-
-  if (label[0] === '<') {
-    addForeignObjectLabel(label, labelSvg);
-    // No margin for HTML elements
-    marginX = marginY = 0;
-  } else {
-    addTextLabel(label,
-                 labelSvg,
-                 Math.floor(node.labelCols),
-                 node.labelCut);
-  }
-
-  var bbox = root.node().getBBox();
-
-  labelSvg.attr('transform',
-             'translate(' + (-bbox.width / 2) + ',' + (-bbox.height / 2) + ')');
-
-  rect
-    .attr('rx', 5)
-    .attr('ry', 5)
-    .attr('x', -(bbox.width / 2 + marginX))
-    .attr('y', -(bbox.height / 2 + marginY))
-    .attr('width', bbox.width + 2 * marginX)
-    .attr('height', bbox.height + 2 * marginY);
-}
-
-function addForeignObjectLabel(label, root) {
-  var fo = root
-    .append('foreignObject')
-      .attr('width', '100000');
-
-  var w, h;
-  fo
-    .append('xhtml:div')
-      .style('float', 'left')
-      // TODO find a better way to get dimensions for foreignObjects...
-      .html(function() { return label; })
-      .each(function() {
-        w = this.clientWidth;
-        h = this.clientHeight;
-      });
-
-  fo
-    .attr('width', w)
-    .attr('height', h);
-}
-
-function addTextLabel(label, root, labelCols, labelCut) {
-  if (labelCut === undefined) labelCut = 'false';
-  labelCut = (labelCut.toString().toLowerCase() === 'true');
-
-  var node = root
-    .append('text')
-    .attr('text-anchor', 'left');
-
-  label = label.replace(/\\n/g, '\n');
-
-  var arr = labelCols ? wordwrap(label, labelCols, labelCut) : label;
-  arr = arr.split('\n');
-  for (var i = 0; i < arr.length; i++) {
-    node
-      .append('tspan')
-        .attr('dy', '1em')
-        .attr('x', '1')
-        .text(arr[i]);
-  }
-}
-
-// Thanks to
-// http://james.padolsey.com/javascript/wordwrap-for-javascript/
-function wordwrap (str, width, cut, brk) {
-     brk = brk || '\n';
-     width = width || 75;
-     cut = cut || false;
-
-     if (!str) { return str; }
-
-     var regex = '.{1,' +width+ '}(\\s|$)' + (cut ? '|.{' +width+ '}|.+$' : '|\\S+?(\\s|$)');
-
-     return str.match( new RegExp(regex, 'g') ).join( brk );
-}
-
-function findMidPoint(points) {
-  var midIdx = points.length / 2;
-  if (points.length % 2) {
-    return points[Math.floor(midIdx)];
-  } else {
-    var p0 = points[midIdx - 1];
-    var p1 = points[midIdx];
-    return {x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2};
-  }
-}
-
+/*
+Rectangle intersection from dagre-d3 source.
+*/
 function intersectRect(rect, point) {
   var x = rect.x;
   var y = rect.y;
@@ -787,382 +140,453 @@ function intersectRect(rect, point) {
   return {x: x + sx, y: y + sy};
 }
 
-function isComposite(g, u) {
-  return 'children' in g && g.children(u).length;
+/*
+ * Create a graph from a config. At the moment, only a list of resources is used
+ * to build the graph.
+ */
+function createGraph(config) {
+  this.hold();
+  if (config && config.resources) {
+    var self = this;
+    config.resources.forEach(function(r) {
+      self.addResource(r);
+    });
+  }
+  this.unhold();
+  return this;
 }
 
-function bind(func, thisArg) {
-  // For some reason PhantomJS occassionally fails when using the builtin bind,
-  // so we check if it is available and if not, use a degenerate polyfill.
-  if (func.bind) {
-    return func.bind(thisArg);
-  }
+function setupSVG(config) {
+  // Create elements on the page for us to render our graph in
+  var parentName = config.inside || 'body';
+  var svg = d3.select(parentName).append('svg');
+  var root = svg.append('g');
 
-  return function() {
-    return func.apply(thisArg, arguments);
+  // Define the #arrowhead shape for use with edge paths.
+  svg.append('svg:defs')
+    .append('svg:marker')
+      .attr('id', 'arrowhead')
+      .attr('viewBox', '0 0 10 10')
+      .attr('refX', 8)
+      .attr('refY', 5)
+      .attr('markerUnits', 'strokeWidth')
+      .attr('markerWidth', 8)
+      .attr('markerHeight', 5)
+      .attr('orient', 'auto')
+      .attr('style', 'fill: #333')
+      .append('svg:path')
+        .attr('d', 'M 0 0 L 10 5 L 0 10 z');
+
+  // Add a 'backstop' so we can catch pointer events on the entire SVG.
+  root.append('rect')
+      .attr('class', 'overlay')
+      .attr('width', '100%')
+      .attr('height', '100%')
+      .style('fill', 'none')
+      .style('pointer-events', 'all');
+
+  // Make zoomable.
+  var el = this.element = root.append('g');
+  var self = this;
+
+  callback.call(this, 'zoom');
+  callback.call(this, 'zoomSetup');
+  this.zoom = d3.behavior.zoom();
+  root.call(this.zoom.on("zoom", function () {
+    self.doZoom(this.zoom);
+  }));
+
+  this.defaultZoomSetup = function(zoom) {
+    zoom.scaleExtent([0.3, 1]);
   };
+  this.onZoomSetup(this.defaultZoomSetup);
+  this.defaultOnZoom = function() {
+    el.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+  };
+  this.onZoom(this.defaultOnZoom);
+
+  // Groups for node and edge SVG elements.
+  this.edgeContainer = this.element.append('g').classed('edges', true);
+  this.nodeContainer = this.element.append('g').classed('nodes', true);
 }
 
-},{"d3":2,"dagre":11}],5:[function(require,module,exports){
-module.exports = '0.1.6-pre';
+/*
+Construct a knowledge map object.
 
-},{}],6:[function(require,module,exports){
-exports.Set = require('./lib/Set');
-exports.PriorityQueue = require('./lib/PriorityQueue');
-exports.version = require('./lib/version');
+Accepts a single object:
+  config: an object that contains the data about the graph and various other
+  options
+  The available options are:
+    graph: a JSON object that contains the graph data
+    plugins: a list of plugin names or plugin objects
+*/
+var KnowledgeMap = function(api, config) {
+  config = config || {};
 
-},{"./lib/PriorityQueue":7,"./lib/Set":8,"./lib/version":10}],7:[function(require,module,exports){
-module.exports = PriorityQueue;
+  /*
+  Hold API
+  */
+  var held    = !!config.held;
+  this.hold   = function() { held = true; return this; }
+  this.unhold = function() { held = false; return this; }
+  this.held   = function() { return held; }
 
-/**
- * A min-priority queue data structure. This algorithm is derived from Cormen,
- * et al., "Introduction to Algorithms". The basic idea of a min-priority
- * queue is that you can efficiently (in O(1) time) get the smallest key in
- * the queue. Adding and removing elements takes O(log n) time. A key can
- * have its priority decreased in O(log n) time.
- */
-function PriorityQueue() {
-  this._arr = [];
-  this._keyIndices = {};
-}
-
-/**
- * Returns the number of elements in the queue. Takes `O(1)` time.
- */
-PriorityQueue.prototype.size = function() {
-  return this._arr.length;
-};
-
-/**
- * Returns the keys that are in the queue. Takes `O(n)` time.
- */
-PriorityQueue.prototype.keys = function() {
-  return this._arr.map(function(x) { return x.key; });
-};
-
-/**
- * Returns `true` if **key** is in the queue and `false` if not.
- */
-PriorityQueue.prototype.has = function(key) {
-  return key in this._keyIndices;
-};
-
-/**
- * Returns the priority for **key**. If **key** is not present in the queue
- * then this function returns `undefined`. Takes `O(1)` time.
- *
- * @param {Object} key
- */
-PriorityQueue.prototype.priority = function(key) {
-  var index = this._keyIndices[key];
-  if (index !== undefined) {
-    return this._arr[index].priority;
-  }
-};
-
-/**
- * Returns the key for the minimum element in this queue. If the queue is
- * empty this function throws an Error. Takes `O(1)` time.
- */
-PriorityQueue.prototype.min = function() {
-  if (this.size() === 0) {
-    throw new Error("Queue underflow");
-  }
-  return this._arr[0].key;
-};
-
-/**
- * Inserts a new key into the priority queue. If the key already exists in
- * the queue this function returns `false`; otherwise it will return `true`.
- * Takes `O(n)` time.
- *
- * @param {Object} key the key to add
- * @param {Number} priority the initial priority for the key
- */
-PriorityQueue.prototype.add = function(key, priority) {
-  var keyIndices = this._keyIndices;
-  if (!(key in keyIndices)) {
-    var arr = this._arr;
-    var index = arr.length;
-    keyIndices[key] = index;
-    arr.push({key: key, priority: priority});
-    this._decrease(index);
-    return true;
-  }
-  return false;
-};
-
-/**
- * Removes and returns the smallest key in the queue. Takes `O(log n)` time.
- */
-PriorityQueue.prototype.removeMin = function() {
-  this._swap(0, this._arr.length - 1);
-  var min = this._arr.pop();
-  delete this._keyIndices[min.key];
-  this._heapify(0);
-  return min.key;
-};
-
-/**
- * Decreases the priority for **key** to **priority**. If the new priority is
- * greater than the previous priority, this function will throw an Error.
- *
- * @param {Object} key the key for which to raise priority
- * @param {Number} priority the new priority for the key
- */
-PriorityQueue.prototype.decrease = function(key, priority) {
-  var index = this._keyIndices[key];
-  if (priority > this._arr[index].priority) {
-    throw new Error("New priority is greater than current priority. " +
-        "Key: " + key + " Old: " + this._arr[index].priority + " New: " + priority);
-  }
-  this._arr[index].priority = priority;
-  this._decrease(index);
-};
-
-PriorityQueue.prototype._heapify = function(i) {
-  var arr = this._arr;
-  var l = 2 * i,
-      r = l + 1,
-      largest = i;
-  if (l < arr.length) {
-    largest = arr[l].priority < arr[largest].priority ? l : largest;
-    if (r < arr.length) {
-      largest = arr[r].priority < arr[largest].priority ? r : largest;
+  /*
+   * Resource API
+   */
+  this.addResource = function(resource) {
+    // Just for uniformity of API, allow a single string to create a named
+    // resource. This will never be useful.
+    if('string' === typeof(resource)) {
+      resource = {
+        id: resource.toLowerCase().replace(/ /g, '-'),
+        label: resource,
+        type: 'resource',
+        content: {},
+        teaches: [],
+        requires: [],
+        needs: []
+      };
+    } else {
+      resource = {
+        id: resource.id || resource.label.toLowerCase().replace(/ /g, '-'),
+        label: resource.label,
+        type: 'resource',
+        content: resource.content || {},
+        teaches: resource.teaches || [],
+        requires: resource.requires || [],
+        needs: resource.needs || []
+      };
     }
-    if (largest !== i) {
-      this._swap(i, largest);
-      this._heapify(largest);
+
+    // Add the resource to the graph as a node.
+    this.graph.addNode(resource.id, resource);
+
+    // Deal with all the dependencies. Add new concepts and assets where
+    // necessary, and add edges in the appropriate direction.
+    var self = this;
+    var id = resource.id;
+
+    // X-teaches-Y is an arrow from resource X to concept Y.
+    if(resource.teaches) {
+      resource.teaches.forEach(function(c) {
+        var cid = self.defineConcept(c);
+        self.graph.addEdge(id+'-teaches-'+cid, id, cid);
+      });
     }
-  }
-};
 
-PriorityQueue.prototype._decrease = function(index) {
-  var arr = this._arr;
-  var priority = arr[index].priority;
-  var parent;
-  while (index !== 0) {
-    parent = index >> 1;
-    if (arr[parent].priority < priority) {
-      break;
+    // Y-requires-X is an arrow from concept Y to resource X.
+    if(resource.requires) {
+      resource.requires.forEach(function(c) {
+        var cid = self.defineConcept(c);
+        self.graph.addEdge(id+'-requires-'+cid, cid, id);
+      });
     }
-    this._swap(index, parent);
-    index = parent;
-  }
-};
 
-PriorityQueue.prototype._swap = function(i, j) {
-  var arr = this._arr;
-  var keyIndices = this._keyIndices;
-  var origArrI = arr[i];
-  var origArrJ = arr[j];
-  arr[i] = origArrJ;
-  arr[j] = origArrI;
-  keyIndices[origArrJ.key] = i;
-  keyIndices[origArrI.key] = j;
-};
-
-},{}],8:[function(require,module,exports){
-var util = require('./util');
-
-module.exports = Set;
-
-/**
- * Constructs a new Set with an optional set of `initialKeys`.
- *
- * It is important to note that keys are coerced to String for most purposes
- * with this object, similar to the behavior of JavaScript's Object. For
- * example, the following will add only one key:
- *
- *     var s = new Set();
- *     s.add(1);
- *     s.add("1");
- *
- * However, the type of the key is preserved internally so that `keys` returns
- * the original key set uncoerced. For the above example, `keys` would return
- * `[1]`.
- */
-function Set(initialKeys) {
-  this._size = 0;
-  this._keys = {};
-
-  if (initialKeys) {
-    for (var i = 0, il = initialKeys.length; i < il; ++i) {
-      this.add(initialKeys[i]);
+    if(resource.needs) {
+      resource.needs.forEach(function(a) {
+        //var aid = self.defineAsset(a);
+      });
     }
-  }
-}
 
-/**
- * Returns a new Set that represents the set intersection of the array of given
- * sets.
- */
-Set.intersect = function(sets) {
-  if (sets.length === 0) {
-    return new Set();
-  }
+    this.render();
+    return id;
+  };
 
-  var result = new Set(!util.isArray(sets[0]) ? sets[0].keys() : sets[0]);
-  for (var i = 1, il = sets.length; i < il; ++i) {
-    var resultKeys = result.keys(),
-        other = !util.isArray(sets[i]) ? sets[i] : new Set(sets[i]);
-    for (var j = 0, jl = resultKeys.length; j < jl; ++j) {
-      var key = resultKeys[j];
-      if (!other.has(key)) {
-        result.remove(key);
+  this.removeResource = function(resourceId) {
+    if('string' !== typeof(resourceId)) {
+      resourceId = resourceId.id;
+    }
+
+    if(this.graph.hasNode(resourceId)) {
+      // Remove resource node and all edges.
+      var resource = this.graph.node(resourceId);
+      this.graph.delNode(resourceId);
+
+      // Remove concept nodes with no more incident edges.
+      var self = this;
+      var removeConcept = function(id) {
+        id = self.defineConcept(id);
+        if(self.graph.hasNode(id)) {
+          if(!self.graph.incidentEdges(id).length) {
+            self.graph.delNode(id);
+          }
+        }
+      };
+
+      if(resource.teaches) { resource.teaches.forEach(removeConcept); }
+      if(resource.requires) { resource.requires.forEach(removeConcept); }
+    }
+
+    this.render();
+  };
+
+  /**
+   Define a concept object that will be included in the graph. If a string is
+   passed, a new concept object will be created. The string is treated as the
+   label of the concept, and converted into a correct ID. If an object is passed,
+   the object will replace the contents of any existing concept with the same ID.
+  */
+  this.defineConcept = function(concept) {
+    var replace = true;
+    if('string' === typeof(concept)) {
+      replace = false;
+      concept = {
+        id: concept.toLowerCase().replace(/ /g, '-'),
+        label: concept,
+        type: 'concept',
+        content: {}
+      };
+    } else {
+      concept = {
+        id: concept.id || concept.label.toLowerCase().replace(/ /g, '-'),
+        label: concept.label,
+        type: 'concept',
+        content: concept.content || {}
+      };
+    }
+
+    if(!this.graph.hasNode(concept.id)) {
+      this.graph.addNode(concept.id, concept);
+      this.render();
+    } else if(replace) {
+      this.graph.node(concept.id, concept);
+      this.render();
+    }
+    return concept.id;
+  };
+
+  /*
+  Creates node text labels.
+  */
+  this.defaultNewNodes = function(nodes) {
+    nodes
+      .classed('concept', function(d) { return 'concept' === d.type })
+      .classed('resource', function(d) { return 'resource' === d.type })
+      .attr('id', function(n) { return n.id; })
+      .append('text')
+        .attr('text-anchor', 'middle')
+        .attr('alignment-baseline', 'middle');
+  };
+
+  /*
+  Sets node labels.
+  */
+  this.defaultUpdateNodes = function(nodes) {
+    nodes.select('text')
+      .text(function(d) { return d.label; });
+  };
+
+  /*
+  Sets node group positions.
+  */
+  this.defaultUpdateNodePositions = function(nodes) {
+    nodes.attr('transform', function(n) {
+        var x = n.layout.x;
+        var y = n.layout.y;
+        return 'translate('+ x + ',' + y + ')';
+      });
+  };
+
+  /*
+  Creates edge paths.
+  */
+  this.defaultNewEdges = function(edges) {
+    edges.append('path')
+      .attr('marker-end', 'url(#arrowhead)');
+  };
+
+  /*
+  Positions edge paths.
+  */
+  this.defaultUpdateEdgePositions = function(edges) {
+    edges.select('path')
+      .attr('d', function(e) {
+        var path = e.layout.points.slice();
+        var p0 = path.length === 0 ? e.source.layout : path[0];
+        var p1 = path.length === 0 ? e.target.layout : path[path.length - 1];
+        path.unshift(intersectRect(e.source.layout, p0));
+        path.push(intersectRect(e.target.layout, p1));
+
+        return d3.svg.line()
+          .x(function(d) { return d.x; })
+          .y(function(d) { return d.y; })
+          .interpolate('basis')
+          (path);
+      });
+  };
+
+  // Create the SVG elements on the page necessary for this graph.
+  setupSVG.call(this, config);
+
+  // Create the three Renderers that link data to the DOM via the default
+  // methods defined above. Extending the renderer is a matter of adding more
+  // callbacks onNew and onUpdate. You can also remove the default behavior by
+  // calling offNew or offUpdate with the default functions.
+
+  this.renderNodes = new Renderer()
+    .into(this.nodeContainer)
+    .key(function(n) { return n.id; })
+    .make(function(e) { return e.append('g'); })
+    .useClass('node')
+    .onNew(this.defaultNewNodes)
+    .onUpdate(this.defaultUpdateNodes);
+
+  this.positionNodes = new Renderer()
+    .into(this.nodeContainer)
+    .key(function(n) { return n.id; })
+    .useClass('node')
+    .onUpdate(this.defaultUpdateNodePositions);
+
+  this.renderEdges = new Renderer()
+    .into(this.edgeContainer)
+    .key(function(d) { return d.id; })
+    .make(function(e) { return e.append('g'); })
+    .useClass('edgePath')
+    .onNew(this.defaultNewEdges);
+
+  this.positionEdges = new Renderer()
+    .into(this.edgeContainer)
+    .key(function(d) { return d.id; })
+    .make(function(e) { return e.append('g'); })
+    .useClass('edgePath')
+    .onUpdate(this.defaultUpdateEdgePositions);
+
+  /*
+  Lays out the graph and renders it into the DOM.
+  */
+  callback.call(this, 'preLayout');
+  callback.call(this, 'postLayout');
+  this.render = function() {
+    if(this.held()) {
+      return;
+    }
+    var self = this;
+
+    // Instead of a list of IDs, our data should be a list of objects.
+    this.nodes = this.graph.nodes().map(function(id) {
+      return self.graph.node(id);
+    });
+    var result = this.renderNodes.run(this.nodes);
+
+    // Add width and height information from the SVG elements.
+    result.data.each(function(d) {
+      d.width = this.getBBox().width;
+      d.height = this.getBBox().height;
+    });
+
+    // Generate a graph layout and render it.
+    var config = dagre.layout();
+    this.doPreLayout(config);
+    var layout = config.run(this.graph);
+    this.doPostLayout(layout);
+    this.provideLayout(layout);
+  };
+
+  /*
+  Give the graph a layout and render it.
+  */
+  this.provideLayout = function(layout) {
+    var self = this;
+    var g = this.graph;
+
+    // Augment existing node data with layout information.
+    this.nodes.forEach(function(node) {
+      node.layout = layout.node(node.id);
+    });
+    this.positionNodes.run(this.nodes);
+
+    var edges = layout.edges().map(function(id) {
+      return {
+        id: id,
+        source: g.node(g.incidentNodes(id)[0]),
+        target: g.node(g.incidentNodes(id)[1]),
+        value: g.edge(id),
+        layout: layout.edge(id)
+      };
+    });
+    this.renderEdges.run(edges);
+    this.positionEdges.run(edges);
+
+    this.layout = layout;
+  };
+
+  // Create the directed graph
+  this.graph = new dagre.Digraph();
+  createGraph.call(this, config);
+
+  // Initialise plugins.
+  if(config.plugins) {
+    for(var i = 0; i < config.plugins.length; i++) {
+      var plugin = config.plugins[i];
+      if('string' === typeof(plugin)) {
+        // If we're just given a name, check the registry for an existing plugin.
+        plugin = api.plugins[plugin];
+        if(undefined === plugin) {
+          console.error('Plugin \'' + config.plugins[i] + '\' not found!');
+        }
+      }
+      if(typeof plugin === 'function') {
+        // If we're provided with a raw function, just run it.
+        plugin(this);
+      }
+      else if(plugin && plugin.run) {
+        // If we have an object with a run member, treat it as a new plugin to
+        // be defined. Add it to the registry if necessary, and run it.
+        if(plugin.name) {
+          api.plugins[plugin.name] = plugin;
+        }
+        plugin.run(this);
       }
     }
+
+    this.__defineGetter__('plugins', function() {
+      return config.plugins;
+    });
+    this.__defineSetter__('plugins', function() {});
   }
 
-  return result;
-};
+  // Callbacks for plugins to respond to.
+  this.doZoomSetup(this.zoom);
 
-/**
- * Returns a new Set that represents the set union of the array of given sets.
- */
-Set.union = function(sets) {
-  var totalElems = util.reduce(sets, function(lhs, rhs) {
-    return lhs + (rhs.size ? rhs.size() : rhs.length);
-  }, 0);
-  var arr = new Array(totalElems);
+  // Display the graph
+  this.render();
 
-  var k = 0;
-  for (var i = 0, il = sets.length; i < il; ++i) {
-    var cur = sets[i],
-        keys = !util.isArray(cur) ? cur.keys() : cur;
-    for (var j = 0, jl = keys.length; j < jl; ++j) {
-      arr[k++] = keys[j];
-    }
-  }
-
-  return new Set(arr);
-};
-
-/**
- * Returns the size of this set in `O(1)` time.
- */
-Set.prototype.size = function() {
-  return this._size;
-};
-
-/**
- * Returns the keys in this set. Takes `O(n)` time.
- */
-Set.prototype.keys = function() {
-  return values(this._keys);
-};
-
-/**
- * Tests if a key is present in this Set. Returns `true` if it is and `false`
- * if not. Takes `O(1)` time.
- */
-Set.prototype.has = function(key) {
-  return key in this._keys;
-};
-
-/**
- * Adds a new key to this Set if it is not already present. Returns `true` if
- * the key was added and `false` if it was already present. Takes `O(1)` time.
- */
-Set.prototype.add = function(key) {
-  if (!(key in this._keys)) {
-    this._keys[key] = key;
-    ++this._size;
-    return true;
-  }
-  return false;
-};
-
-/**
- * Removes a key from this Set. If the key was removed this function returns
- * `true`. If not, it returns `false`. Takes `O(1)` time.
- */
-Set.prototype.remove = function(key) {
-  if (key in this._keys) {
-    delete this._keys[key];
-    --this._size;
-    return true;
-  }
-  return false;
+  return this;
 };
 
 /*
- * Returns an array of all values for properties of **o**.
- */
-function values(o) {
-  var ks = Object.keys(o),
-      len = ks.length,
-      result = new Array(len),
-      i;
-  for (i = 0; i < len; ++i) {
-    result[i] = o[ks[i]];
+Public API for the knowledge-map library
+*/
+var api = {
+  d3: d3,
+  dagre: dagre,
+
+  /*
+  Create a knowledge map display that layouts out the entire graph.
+  */
+  create: function(config) {
+    return new KnowledgeMap(this, config);
+  },
+
+  plugins: {
+    'hamburger-nodes': require('./hamburger-nodes-plugin.js')
+  },
+
+  registerPlugin: function(plugin) {
+    if(plugin && plugin.name && plugin.run) {
+      this.plugins[plugin.name] = plugin;
+    }
   }
-  return result;
-}
+};
 
-},{"./util":9}],9:[function(require,module,exports){
-/*
- * This polyfill comes from
- * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/isArray
- */
-if(!Array.isArray) {
-  exports.isArray = function (vArg) {
-    return Object.prototype.toString.call(vArg) === '[object Array]';
-  };
-} else {
-  exports.isArray = Array.isArray;
-}
+global.knowledgeMap = api; 
+module.exports = api;
 
-/*
- * Slightly adapted polyfill from
- * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Reduce
- */
-if ('function' !== typeof Array.prototype.reduce) {
-  exports.reduce = function(array, callback, opt_initialValue) {
-    'use strict';
-    if (null === array || 'undefined' === typeof array) {
-      // At the moment all modern browsers, that support strict mode, have
-      // native implementation of Array.prototype.reduce. For instance, IE8
-      // does not support strict mode, so this check is actually useless.
-      throw new TypeError(
-          'Array.prototype.reduce called on null or undefined');
-    }
-    if ('function' !== typeof callback) {
-      throw new TypeError(callback + ' is not a function');
-    }
-    var index, value,
-        length = array.length >>> 0,
-        isValueSet = false;
-    if (1 < arguments.length) {
-      value = opt_initialValue;
-      isValueSet = true;
-    }
-    for (index = 0; length > index; ++index) {
-      if (array.hasOwnProperty(index)) {
-        if (isValueSet) {
-          value = callback(value, array[index], index, array);
-        }
-        else {
-          value = array[index];
-          isValueSet = true;
-        }
-      }
-    }
-    if (!isValueSet) {
-      throw new TypeError('Reduce of empty array with no initial value');
-    }
-    return value;
-  };
-} else {
-  exports.reduce = function(array, callback, opt_initialValue) {
-    return array.reduce(callback, opt_initialValue);
-  };
-}
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./hamburger-nodes-plugin.js":49,"d3":2,"dagre":3}],2:[function(require,module,exports){
 
-},{}],10:[function(require,module,exports){
-module.exports = '1.1.3';
-
-},{}],11:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 /*
 Copyright (c) 2012-2013 Chris Pettitt
 
@@ -1188,8 +612,62 @@ exports.Digraph = require("graphlib").Digraph;
 exports.Graph = require("graphlib").Graph;
 exports.layout = require("./lib/layout");
 exports.version = require("./lib/version");
+exports.debug = require("./lib/debug");
 
-},{"./lib/layout":12,"./lib/version":27,"graphlib":28}],12:[function(require,module,exports){
+},{"./lib/debug":4,"./lib/layout":5,"./lib/version":20,"graphlib":26}],4:[function(require,module,exports){
+'use strict';
+
+var util = require('./util');
+
+/**
+ * Renders a graph in a stringified DOT format that indicates the ordering of
+ * nodes by layer. Circles represent normal nodes. Diamons represent dummy
+ * nodes. While we try to put nodes in clusters, it appears that graphviz
+ * does not respect this because we're later using subgraphs for ordering nodes
+ * in each layer.
+ */
+exports.dotOrdering = function(g) {
+  var ordering = util.ordering(g.filterNodes(util.filterNonSubgraphs(g)));
+  var result = 'digraph {';
+
+  function dfs(u) {
+    var children = g.children(u);
+    if (children.length) {
+      result += 'subgraph cluster_' + u + ' {';
+      result += 'label="' + u + '";';
+      children.forEach(function(v) {
+        dfs(v);
+      });
+      result += '}';
+    } else {
+      result += u;
+      if (g.node(u).dummy) {
+        result += ' [shape=diamond]';
+      }
+      result += ';';
+    }
+  }
+
+  g.children(null).forEach(dfs);
+
+  ordering.forEach(function(layer) {
+    result += 'subgraph { rank=same; edge [style="invis"];';
+    result += layer.join('->');
+    result += '}';
+  });
+
+  g.eachEdge(function(e, u, v) {
+    result += u + '->' + v + ';';
+  });
+
+  result += '}';
+
+  return result;
+};
+
+},{"./util":19}],5:[function(require,module,exports){
+'use strict';
+
 var util = require('./util'),
     rank = require('./rank'),
     order = require('./order'),
@@ -1458,7 +936,9 @@ module.exports = function() {
 };
 
 
-},{"./order":13,"./position":18,"./rank":19,"./util":26,"graphlib":28}],13:[function(require,module,exports){
+},{"./order":6,"./position":11,"./rank":12,"./util":19,"graphlib":26}],6:[function(require,module,exports){
+'use strict';
+
 var util = require('./util'),
     crossCount = require('./order/crossCount'),
     initLayerGraphs = require('./order/initLayerGraphs'),
@@ -1561,19 +1041,21 @@ function sweep(g, layerGraphs, iter) {
 
 function sweepDown(g, layerGraphs) {
   var cg;
-  for (i = 1; i < layerGraphs.length; ++i) {
+  for (var i = 1; i < layerGraphs.length; ++i) {
     cg = sortLayer(layerGraphs[i], cg, predecessorWeights(g, layerGraphs[i].nodes()));
   }
 }
 
 function sweepUp(g, layerGraphs) {
   var cg;
-  for (i = layerGraphs.length - 2; i >= 0; --i) {
+  for (var i = layerGraphs.length - 2; i >= 0; --i) {
     sortLayer(layerGraphs[i], cg, successorWeights(g, layerGraphs[i].nodes()));
   }
 }
 
-},{"./order/crossCount":14,"./order/initLayerGraphs":15,"./order/initOrder":16,"./order/sortLayer":17,"./util":26}],14:[function(require,module,exports){
+},{"./order/crossCount":7,"./order/initLayerGraphs":8,"./order/initOrder":9,"./order/sortLayer":10,"./util":19}],7:[function(require,module,exports){
+'use strict';
+
 var util = require('../util');
 
 module.exports = crossCount;
@@ -1630,7 +1112,9 @@ function twoLayerCrossCount(g, layer1, layer2) {
   return cc;
 }
 
-},{"../util":26}],15:[function(require,module,exports){
+},{"../util":19}],8:[function(require,module,exports){
+'use strict';
+
 var nodesFromList = require('graphlib').filter.nodesFromList,
     /* jshint -W079 */
     Set = require('cp-data').Set;
@@ -1681,7 +1165,9 @@ function initLayerGraphs(g) {
   return layerGraphs;
 }
 
-},{"cp-data":6,"graphlib":28}],16:[function(require,module,exports){
+},{"cp-data":21,"graphlib":26}],9:[function(require,module,exports){
+'use strict';
+
 var crossCount = require('./crossCount'),
     util = require('../util');
 
@@ -1719,52 +1205,26 @@ function initOrder(g, random) {
   g.graph().orderCC = Number.MAX_VALUE;
 }
 
-},{"../util":26,"./crossCount":14}],17:[function(require,module,exports){
-var util = require('../util');
-/*
+},{"../util":19,"./crossCount":7}],10:[function(require,module,exports){
+'use strict';
+
+var util = require('../util'),
     Digraph = require('graphlib').Digraph,
     topsort = require('graphlib').alg.topsort,
     nodesFromList = require('graphlib').filter.nodesFromList;
-*/
 
 module.exports = sortLayer;
 
-/*
 function sortLayer(g, cg, weights) {
+  weights = adjustWeights(g, weights);
   var result = sortLayerSubgraph(g, null, cg, weights);
+
   result.list.forEach(function(u, i) {
     g.node(u).order = i;
   });
   return result.constraintGraph;
 }
-*/
 
-function sortLayer(g, cg, weights) {
-  var ordering = [];
-  var bs = {};
-  g.eachNode(function(u, value) {
-    ordering[value.order] = u;
-    var ws = weights[u];
-    if (ws.length) {
-      bs[u] = util.sum(ws) / ws.length;
-    }
-  });
-
-  var toSort = g.nodes().filter(function(u) { return bs[u] !== undefined; });
-  toSort.sort(function(x, y) {
-    return bs[x] - bs[y] || g.node(x).order - g.node(y).order;
-  });
-
-  for (var i = 0, j = 0, jl = toSort.length; j < jl; ++i) {
-    if (bs[ordering[i]] !== undefined) {
-      g.node(toSort[j++]).order = i;
-    }
-  }
-}
-
-// TOOD: re-enable constrained sorting once we have a strategy for handling
-// undefined barycenters.
-/*
 function sortLayerSubgraph(g, sg, cg, weights) {
   cg = cg ? cg.filterNodes(nodesFromList(g.children(sg))) : new Digraph();
 
@@ -1778,7 +1238,9 @@ function sortLayerSubgraph(g, sg, cg, weights) {
       var ws = weights[u];
       nodeData[u] = {
         degree: ws.length,
-        barycenter: ws.length > 0 ? util.sum(ws) / ws.length : 0,
+        barycenter: util.sum(ws) / ws.length,
+        order: g.node(u).order,
+        orderCount: 1,
         list: [u]
       };
     }
@@ -1788,7 +1250,8 @@ function sortLayerSubgraph(g, sg, cg, weights) {
 
   var keys = Object.keys(nodeData);
   keys.sort(function(x, y) {
-    return nodeData[x].barycenter - nodeData[y].barycenter;
+    return nodeData[x].barycenter - nodeData[y].barycenter ||
+           nodeData[x].order - nodeData[y].order;
   });
 
   var result =  keys.map(function(u) { return nodeData[u]; })
@@ -1796,7 +1259,6 @@ function sortLayerSubgraph(g, sg, cg, weights) {
   return result;
 }
 
-/*
 function mergeNodeData(g, lhs, rhs) {
   var cg = mergeDigraphs(lhs.constraintGraph, rhs.constraintGraph);
 
@@ -1813,6 +1275,9 @@ function mergeNodeData(g, lhs, rhs) {
     degree: lhs.degree + rhs.degree,
     barycenter: (lhs.barycenter * lhs.degree + rhs.barycenter * rhs.degree) /
                 (lhs.degree + rhs.degree),
+    order: (lhs.order * lhs.orderCount + rhs.order * rhs.orderCount) /
+           (lhs.orderCount + rhs.orderCount),
+    orderCount: lhs.orderCount + rhs.orderCount,
     list: lhs.list.concat(rhs.list),
     firstSG: lhs.firstSG !== undefined ? lhs.firstSG : rhs.firstSG,
     lastSG: rhs.lastSG !== undefined ? rhs.lastSG : lhs.lastSG,
@@ -1882,9 +1347,48 @@ function findViolatedConstraint(cg, nodeData) {
     }
   }
 }
-*/
 
-},{"../util":26}],18:[function(require,module,exports){
+// Adjust weights so that they fall in the range of 0..|N|-1. If a node has no
+// weight assigned then set its adjusted weight to its current position. This
+// allows us to better retain the origiinal position of nodes without neighbors.
+function adjustWeights(g, weights) {
+  var minW = Number.MAX_VALUE,
+      maxW = 0,
+      adjusted = {};
+  g.eachNode(function(u) {
+    if (g.children(u).length) return;
+
+    var ws = weights[u];
+    if (ws.length) {
+      minW = Math.min(minW, util.min(ws));
+      maxW = Math.max(maxW, util.max(ws));
+    }
+  });
+
+  var rangeW = (maxW - minW);
+  g.eachNode(function(u) {
+    if (g.children(u).length) return;
+
+    var ws = weights[u];
+    if (!ws.length) {
+      adjusted[u] = [g.node(u).order];
+    } else {
+      adjusted[u] = ws.map(function(w) {
+        if (rangeW) {
+          return (w - minW) * (g.order() - 1) / rangeW;
+        } else {
+          return g.order() - 1 / 2;
+        }
+      });
+    }
+  });
+
+  return adjusted;
+}
+
+},{"../util":19,"graphlib":26}],11:[function(require,module,exports){
+'use strict';
+
 var util = require('./util');
 
 /*
@@ -2324,7 +1828,9 @@ module.exports = function() {
   }
 };
 
-},{"./util":26}],19:[function(require,module,exports){
+},{"./util":19}],12:[function(require,module,exports){
+'use strict';
+
 var util = require('./util'),
     acyclic = require('./rank/acyclic'),
     initRank = require('./rank/initRank'),
@@ -2462,7 +1968,9 @@ function normalize(g) {
   g.eachNode(function(u, node) { node.rank -= m; });
 }
 
-},{"./rank/acyclic":20,"./rank/constraints":21,"./rank/feasibleTree":22,"./rank/initRank":23,"./rank/simplex":25,"./util":26,"graphlib":28}],20:[function(require,module,exports){
+},{"./rank/acyclic":13,"./rank/constraints":14,"./rank/feasibleTree":15,"./rank/initRank":16,"./rank/simplex":18,"./util":19,"graphlib":26}],13:[function(require,module,exports){
+'use strict';
+
 var util = require('../util');
 
 module.exports = acyclic;
@@ -2525,7 +2033,9 @@ function undo(g) {
   });
 }
 
-},{"../util":26}],21:[function(require,module,exports){
+},{"../util":19}],14:[function(require,module,exports){
+'use strict';
+
 exports.apply = function(g) {
   function dfs(sg) {
     var rankSets = {};
@@ -2694,7 +2204,9 @@ exports.relax = function(g) {
   });
 };
 
-},{}],22:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
+'use strict';
+
 /* jshint -W079 */
 var Set = require('cp-data').Set,
 /* jshint +W079 */
@@ -2819,7 +2331,9 @@ function slack(g, u, v) {
   return rankDiff - maxMinLen;
 }
 
-},{"../util":26,"cp-data":6,"graphlib":28}],23:[function(require,module,exports){
+},{"../util":19,"cp-data":21,"graphlib":26}],16:[function(require,module,exports){
+'use strict';
+
 var util = require('../util'),
     topsort = require('graphlib').alg.topsort;
 
@@ -2851,7 +2365,9 @@ function initRank(g) {
   });
 }
 
-},{"../util":26,"graphlib":28}],24:[function(require,module,exports){
+},{"../util":19,"graphlib":26}],17:[function(require,module,exports){
+'use strict';
+
 module.exports = {
   slack: slack
 };
@@ -2869,7 +2385,9 @@ function slack(graph, u, v, minLen) {
   return Math.abs(graph.node(u).rank - graph.node(v).rank) - minLen;
 }
 
-},{}],25:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
+'use strict';
+
 var util = require('../util'),
     rankUtil = require('./rankUtil');
 
@@ -3179,7 +2697,9 @@ function minimumLength(graph, u, v) {
   }
 }
 
-},{"../util":26,"./rankUtil":24}],26:[function(require,module,exports){
+},{"../util":19,"./rankUtil":17}],19:[function(require,module,exports){
+'use strict';
+
 /*
  * Returns the smallest value in the array.
  */
@@ -3223,7 +2743,7 @@ exports.values = function(obj) {
 };
 
 exports.shuffle = function(array) {
-  for (i = array.length - 1; i > 0; --i) {
+  for (var i = array.length - 1; i > 0; --i) {
     var j = Math.floor(Math.random() * (i + 1));
     var aj = array[j];
     array[j] = array[i];
@@ -3298,10 +2818,366 @@ log.level = 0;
 
 exports.log = log;
 
-},{}],27:[function(require,module,exports){
-module.exports = '0.4.5';
+},{}],20:[function(require,module,exports){
+module.exports = '0.4.6';
 
-},{}],28:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
+exports.Set = require('./lib/Set');
+exports.PriorityQueue = require('./lib/PriorityQueue');
+exports.version = require('./lib/version');
+
+},{"./lib/PriorityQueue":22,"./lib/Set":23,"./lib/version":25}],22:[function(require,module,exports){
+module.exports = PriorityQueue;
+
+/**
+ * A min-priority queue data structure. This algorithm is derived from Cormen,
+ * et al., "Introduction to Algorithms". The basic idea of a min-priority
+ * queue is that you can efficiently (in O(1) time) get the smallest key in
+ * the queue. Adding and removing elements takes O(log n) time. A key can
+ * have its priority decreased in O(log n) time.
+ */
+function PriorityQueue() {
+  this._arr = [];
+  this._keyIndices = {};
+}
+
+/**
+ * Returns the number of elements in the queue. Takes `O(1)` time.
+ */
+PriorityQueue.prototype.size = function() {
+  return this._arr.length;
+};
+
+/**
+ * Returns the keys that are in the queue. Takes `O(n)` time.
+ */
+PriorityQueue.prototype.keys = function() {
+  return this._arr.map(function(x) { return x.key; });
+};
+
+/**
+ * Returns `true` if **key** is in the queue and `false` if not.
+ */
+PriorityQueue.prototype.has = function(key) {
+  return key in this._keyIndices;
+};
+
+/**
+ * Returns the priority for **key**. If **key** is not present in the queue
+ * then this function returns `undefined`. Takes `O(1)` time.
+ *
+ * @param {Object} key
+ */
+PriorityQueue.prototype.priority = function(key) {
+  var index = this._keyIndices[key];
+  if (index !== undefined) {
+    return this._arr[index].priority;
+  }
+};
+
+/**
+ * Returns the key for the minimum element in this queue. If the queue is
+ * empty this function throws an Error. Takes `O(1)` time.
+ */
+PriorityQueue.prototype.min = function() {
+  if (this.size() === 0) {
+    throw new Error("Queue underflow");
+  }
+  return this._arr[0].key;
+};
+
+/**
+ * Inserts a new key into the priority queue. If the key already exists in
+ * the queue this function returns `false`; otherwise it will return `true`.
+ * Takes `O(n)` time.
+ *
+ * @param {Object} key the key to add
+ * @param {Number} priority the initial priority for the key
+ */
+PriorityQueue.prototype.add = function(key, priority) {
+  var keyIndices = this._keyIndices;
+  if (!(key in keyIndices)) {
+    var arr = this._arr;
+    var index = arr.length;
+    keyIndices[key] = index;
+    arr.push({key: key, priority: priority});
+    this._decrease(index);
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Removes and returns the smallest key in the queue. Takes `O(log n)` time.
+ */
+PriorityQueue.prototype.removeMin = function() {
+  this._swap(0, this._arr.length - 1);
+  var min = this._arr.pop();
+  delete this._keyIndices[min.key];
+  this._heapify(0);
+  return min.key;
+};
+
+/**
+ * Decreases the priority for **key** to **priority**. If the new priority is
+ * greater than the previous priority, this function will throw an Error.
+ *
+ * @param {Object} key the key for which to raise priority
+ * @param {Number} priority the new priority for the key
+ */
+PriorityQueue.prototype.decrease = function(key, priority) {
+  var index = this._keyIndices[key];
+  if (priority > this._arr[index].priority) {
+    throw new Error("New priority is greater than current priority. " +
+        "Key: " + key + " Old: " + this._arr[index].priority + " New: " + priority);
+  }
+  this._arr[index].priority = priority;
+  this._decrease(index);
+};
+
+PriorityQueue.prototype._heapify = function(i) {
+  var arr = this._arr;
+  var l = 2 * i,
+      r = l + 1,
+      largest = i;
+  if (l < arr.length) {
+    largest = arr[l].priority < arr[largest].priority ? l : largest;
+    if (r < arr.length) {
+      largest = arr[r].priority < arr[largest].priority ? r : largest;
+    }
+    if (largest !== i) {
+      this._swap(i, largest);
+      this._heapify(largest);
+    }
+  }
+};
+
+PriorityQueue.prototype._decrease = function(index) {
+  var arr = this._arr;
+  var priority = arr[index].priority;
+  var parent;
+  while (index !== 0) {
+    parent = index >> 1;
+    if (arr[parent].priority < priority) {
+      break;
+    }
+    this._swap(index, parent);
+    index = parent;
+  }
+};
+
+PriorityQueue.prototype._swap = function(i, j) {
+  var arr = this._arr;
+  var keyIndices = this._keyIndices;
+  var origArrI = arr[i];
+  var origArrJ = arr[j];
+  arr[i] = origArrJ;
+  arr[j] = origArrI;
+  keyIndices[origArrJ.key] = i;
+  keyIndices[origArrI.key] = j;
+};
+
+},{}],23:[function(require,module,exports){
+var util = require('./util');
+
+module.exports = Set;
+
+/**
+ * Constructs a new Set with an optional set of `initialKeys`.
+ *
+ * It is important to note that keys are coerced to String for most purposes
+ * with this object, similar to the behavior of JavaScript's Object. For
+ * example, the following will add only one key:
+ *
+ *     var s = new Set();
+ *     s.add(1);
+ *     s.add("1");
+ *
+ * However, the type of the key is preserved internally so that `keys` returns
+ * the original key set uncoerced. For the above example, `keys` would return
+ * `[1]`.
+ */
+function Set(initialKeys) {
+  this._size = 0;
+  this._keys = {};
+
+  if (initialKeys) {
+    for (var i = 0, il = initialKeys.length; i < il; ++i) {
+      this.add(initialKeys[i]);
+    }
+  }
+}
+
+/**
+ * Returns a new Set that represents the set intersection of the array of given
+ * sets.
+ */
+Set.intersect = function(sets) {
+  if (sets.length === 0) {
+    return new Set();
+  }
+
+  var result = new Set(!util.isArray(sets[0]) ? sets[0].keys() : sets[0]);
+  for (var i = 1, il = sets.length; i < il; ++i) {
+    var resultKeys = result.keys(),
+        other = !util.isArray(sets[i]) ? sets[i] : new Set(sets[i]);
+    for (var j = 0, jl = resultKeys.length; j < jl; ++j) {
+      var key = resultKeys[j];
+      if (!other.has(key)) {
+        result.remove(key);
+      }
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Returns a new Set that represents the set union of the array of given sets.
+ */
+Set.union = function(sets) {
+  var totalElems = util.reduce(sets, function(lhs, rhs) {
+    return lhs + (rhs.size ? rhs.size() : rhs.length);
+  }, 0);
+  var arr = new Array(totalElems);
+
+  var k = 0;
+  for (var i = 0, il = sets.length; i < il; ++i) {
+    var cur = sets[i],
+        keys = !util.isArray(cur) ? cur.keys() : cur;
+    for (var j = 0, jl = keys.length; j < jl; ++j) {
+      arr[k++] = keys[j];
+    }
+  }
+
+  return new Set(arr);
+};
+
+/**
+ * Returns the size of this set in `O(1)` time.
+ */
+Set.prototype.size = function() {
+  return this._size;
+};
+
+/**
+ * Returns the keys in this set. Takes `O(n)` time.
+ */
+Set.prototype.keys = function() {
+  return values(this._keys);
+};
+
+/**
+ * Tests if a key is present in this Set. Returns `true` if it is and `false`
+ * if not. Takes `O(1)` time.
+ */
+Set.prototype.has = function(key) {
+  return key in this._keys;
+};
+
+/**
+ * Adds a new key to this Set if it is not already present. Returns `true` if
+ * the key was added and `false` if it was already present. Takes `O(1)` time.
+ */
+Set.prototype.add = function(key) {
+  if (!(key in this._keys)) {
+    this._keys[key] = key;
+    ++this._size;
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Removes a key from this Set. If the key was removed this function returns
+ * `true`. If not, it returns `false`. Takes `O(1)` time.
+ */
+Set.prototype.remove = function(key) {
+  if (key in this._keys) {
+    delete this._keys[key];
+    --this._size;
+    return true;
+  }
+  return false;
+};
+
+/*
+ * Returns an array of all values for properties of **o**.
+ */
+function values(o) {
+  var ks = Object.keys(o),
+      len = ks.length,
+      result = new Array(len),
+      i;
+  for (i = 0; i < len; ++i) {
+    result[i] = o[ks[i]];
+  }
+  return result;
+}
+
+},{"./util":24}],24:[function(require,module,exports){
+/*
+ * This polyfill comes from
+ * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/isArray
+ */
+if(!Array.isArray) {
+  exports.isArray = function (vArg) {
+    return Object.prototype.toString.call(vArg) === '[object Array]';
+  };
+} else {
+  exports.isArray = Array.isArray;
+}
+
+/*
+ * Slightly adapted polyfill from
+ * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Reduce
+ */
+if ('function' !== typeof Array.prototype.reduce) {
+  exports.reduce = function(array, callback, opt_initialValue) {
+    'use strict';
+    if (null === array || 'undefined' === typeof array) {
+      // At the moment all modern browsers, that support strict mode, have
+      // native implementation of Array.prototype.reduce. For instance, IE8
+      // does not support strict mode, so this check is actually useless.
+      throw new TypeError(
+          'Array.prototype.reduce called on null or undefined');
+    }
+    if ('function' !== typeof callback) {
+      throw new TypeError(callback + ' is not a function');
+    }
+    var index, value,
+        length = array.length >>> 0,
+        isValueSet = false;
+    if (1 < arguments.length) {
+      value = opt_initialValue;
+      isValueSet = true;
+    }
+    for (index = 0; length > index; ++index) {
+      if (array.hasOwnProperty(index)) {
+        if (isValueSet) {
+          value = callback(value, array[index], index, array);
+        }
+        else {
+          value = array[index];
+          isValueSet = true;
+        }
+      }
+    }
+    if (!isValueSet) {
+      throw new TypeError('Reduce of empty array with no initial value');
+    }
+    return value;
+  };
+} else {
+  exports.reduce = function(array, callback, opt_initialValue) {
+    return array.reduce(callback, opt_initialValue);
+  };
+}
+
+},{}],25:[function(require,module,exports){
+module.exports = '1.1.3';
+
+},{}],26:[function(require,module,exports){
 exports.Graph = require("./lib/Graph");
 exports.Digraph = require("./lib/Digraph");
 exports.CGraph = require("./lib/CGraph");
@@ -3334,7 +3210,7 @@ exports.filter = {
 
 exports.version = require("./lib/version");
 
-},{"./lib/CDigraph":30,"./lib/CGraph":31,"./lib/Digraph":32,"./lib/Graph":33,"./lib/alg/components":34,"./lib/alg/dijkstra":35,"./lib/alg/dijkstraAll":36,"./lib/alg/findCycles":37,"./lib/alg/floydWarshall":38,"./lib/alg/isAcyclic":39,"./lib/alg/postorder":40,"./lib/alg/preorder":41,"./lib/alg/prim":42,"./lib/alg/tarjan":43,"./lib/alg/topsort":44,"./lib/converter/json.js":46,"./lib/filter":47,"./lib/graph-converters":48,"./lib/version":50}],29:[function(require,module,exports){
+},{"./lib/CDigraph":28,"./lib/CGraph":29,"./lib/Digraph":30,"./lib/Graph":31,"./lib/alg/components":32,"./lib/alg/dijkstra":33,"./lib/alg/dijkstraAll":34,"./lib/alg/findCycles":35,"./lib/alg/floydWarshall":36,"./lib/alg/isAcyclic":37,"./lib/alg/postorder":38,"./lib/alg/preorder":39,"./lib/alg/prim":40,"./lib/alg/tarjan":41,"./lib/alg/topsort":42,"./lib/converter/json.js":44,"./lib/filter":45,"./lib/graph-converters":46,"./lib/version":48}],27:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -3531,7 +3407,7 @@ function delEdgeFromMap(map, v, e) {
 }
 
 
-},{"cp-data":6}],30:[function(require,module,exports){
+},{"cp-data":21}],28:[function(require,module,exports){
 var Digraph = require("./Digraph"),
     compoundify = require("./compoundify");
 
@@ -3568,7 +3444,7 @@ CDigraph.prototype.toString = function() {
   return "CDigraph " + JSON.stringify(this, null, 2);
 };
 
-},{"./Digraph":32,"./compoundify":45}],31:[function(require,module,exports){
+},{"./Digraph":30,"./compoundify":43}],29:[function(require,module,exports){
 var Graph = require("./Graph"),
     compoundify = require("./compoundify");
 
@@ -3605,7 +3481,7 @@ CGraph.prototype.toString = function() {
   return "CGraph " + JSON.stringify(this, null, 2);
 };
 
-},{"./Graph":33,"./compoundify":45}],32:[function(require,module,exports){
+},{"./Graph":31,"./compoundify":43}],30:[function(require,module,exports){
 /*
  * This file is organized with in the following order:
  *
@@ -3873,7 +3749,7 @@ Digraph.prototype._filterNodes = function(pred) {
 };
 
 
-},{"./BaseGraph":29,"./util":49,"cp-data":6}],33:[function(require,module,exports){
+},{"./BaseGraph":27,"./util":47,"cp-data":21}],31:[function(require,module,exports){
 /*
  * This file is organized with in the following order:
  *
@@ -4008,7 +3884,7 @@ Graph.prototype.delEdge = function(e) {
 };
 
 
-},{"./BaseGraph":29,"./util":49,"cp-data":6}],34:[function(require,module,exports){
+},{"./BaseGraph":27,"./util":47,"cp-data":21}],32:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -4051,7 +3927,7 @@ function components(g) {
   return results;
 }
 
-},{"cp-data":6}],35:[function(require,module,exports){
+},{"cp-data":21}],33:[function(require,module,exports){
 var PriorityQueue = require("cp-data").PriorityQueue;
 
 module.exports = dijkstra;
@@ -4131,7 +4007,7 @@ function dijkstra(g, source, weightFunc, incidentFunc) {
   return results;
 }
 
-},{"cp-data":6}],36:[function(require,module,exports){
+},{"cp-data":21}],34:[function(require,module,exports){
 var dijkstra = require("./dijkstra");
 
 module.exports = dijkstraAll;
@@ -4168,7 +4044,7 @@ function dijkstraAll(g, weightFunc, incidentFunc) {
   return results;
 }
 
-},{"./dijkstra":35}],37:[function(require,module,exports){
+},{"./dijkstra":33}],35:[function(require,module,exports){
 var tarjan = require("./tarjan");
 
 module.exports = findCycles;
@@ -4190,7 +4066,7 @@ function findCycles(g) {
   return tarjan(g).filter(function(cmpt) { return cmpt.length > 1; });
 }
 
-},{"./tarjan":43}],38:[function(require,module,exports){
+},{"./tarjan":41}],36:[function(require,module,exports){
 module.exports = floydWarshall;
 
 /**
@@ -4269,7 +4145,7 @@ function floydWarshall(g, weightFunc, incidentFunc) {
   return results;
 }
 
-},{}],39:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 var topsort = require("./topsort");
 
 module.exports = isAcyclic;
@@ -4295,7 +4171,7 @@ function isAcyclic(g) {
   return true;
 }
 
-},{"./topsort":44}],40:[function(require,module,exports){
+},{"./topsort":42}],38:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -4322,7 +4198,7 @@ function postorder(g, root, f) {
   dfs(root);
 }
 
-},{"cp-data":6}],41:[function(require,module,exports){
+},{"cp-data":21}],39:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -4349,7 +4225,7 @@ function preorder(g, root, f) {
   dfs(root);
 }
 
-},{"cp-data":6}],42:[function(require,module,exports){
+},{"cp-data":21}],40:[function(require,module,exports){
 var Graph = require("../Graph"),
     PriorityQueue = require("cp-data").PriorityQueue;
 
@@ -4420,7 +4296,7 @@ function prim(g, weightFunc) {
   return result;
 }
 
-},{"../Graph":33,"cp-data":6}],43:[function(require,module,exports){
+},{"../Graph":31,"cp-data":21}],41:[function(require,module,exports){
 module.exports = tarjan;
 
 /**
@@ -4488,7 +4364,7 @@ function tarjan(g) {
   return results;
 }
 
-},{}],44:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 module.exports = topsort;
 topsort.CycleException = CycleException;
 
@@ -4546,7 +4422,7 @@ CycleException.prototype.toString = function() {
   return "Graph has at least one cycle";
 };
 
-},{}],45:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 // This file provides a helper function that mixes-in Dot behavior to an
 // existing graph prototype.
 
@@ -4654,7 +4530,7 @@ function compoundify(SuperConstructor) {
   return Constructor;
 }
 
-},{"cp-data":6}],46:[function(require,module,exports){
+},{"cp-data":21}],44:[function(require,module,exports){
 var Graph = require("../Graph"),
     Digraph = require("../Digraph"),
     CGraph = require("../CGraph"),
@@ -4744,7 +4620,7 @@ function typeOf(obj) {
   return Object.prototype.toString.call(obj).slice(8, -1);
 }
 
-},{"../CDigraph":30,"../CGraph":31,"../Digraph":32,"../Graph":33}],47:[function(require,module,exports){
+},{"../CDigraph":28,"../CGraph":29,"../Digraph":30,"../Graph":31}],45:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -4760,7 +4636,7 @@ exports.nodesFromList = function(nodes) {
   };
 };
 
-},{"cp-data":6}],48:[function(require,module,exports){
+},{"cp-data":21}],46:[function(require,module,exports){
 var Graph = require("./Graph"),
     Digraph = require("./Digraph");
 
@@ -4799,7 +4675,7 @@ Digraph.prototype.asUndirected = function() {
   return g;
 };
 
-},{"./Digraph":32,"./Graph":33}],49:[function(require,module,exports){
+},{"./Digraph":30,"./Graph":31}],47:[function(require,module,exports){
 // Returns an array of all values for properties of **o**.
 exports.values = function(o) {
   var ks = Object.keys(o),
@@ -4812,1023 +4688,137 @@ exports.values = function(o) {
   return result;
 };
 
-},{}],50:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 module.exports = '0.7.4';
 
-},{}],51:[function(require,module,exports){
-function setupClickEvents(kg) {
-  kg.onEvent('renderGraph', function(e) {
-    e.nodes.select('text')
-      .on('click', function (conceptId) {
-        kg.postEvent({
-          type: 'clickConcept',
-          concept: kg.graph.node(conceptId).concept
-        });
-      });
-  });
-};
-
-module.exports = {
-  name: 'click-events',
-  run: setupClickEvents
-};
-
-},{}],52:[function(require,module,exports){
-var d3 = require('d3');
-var modal = require('../node_modules/PicoModal/src/picoModal.js');
-
-function addNodeModalEvents(kg, graph, nodes) {
-  nodes.select('text')
-    .on('click', function render(conceptId) {
-      var concept = graph.node(conceptId).concept;
-      var contents = concept.content;
-      if(!contents || !contents.forEach) {
-        concept.content = contents = [];
-      }
-      var title = concept.name;
-      // The IDs of the to-be-deleted content items before we actually delete them in saveContent()
-      var deleted = [];
-
-      var editModal = modal({
-        content: '',
-        width: 700,
-        closeButton: true,
-      });
-
-      var modalElem = d3.select(editModal.modalElem)
-        .style('overflow-y', 'scroll')
-        .style('max-height', '500px')
-        .style('background-color', 'white')
-        .style('padding', '20px');
-
-      modalElem.append('input')
-        .attr('type', 'text')
-        .attr('id', 'title')
-        .property('value', title);
-
-      var contentArea = modalElem.append('div').attr('class', 'content-area');
-
-      // A function to create a new content item from a given JS object
-      var article = function(type, content, index) {
-        var articleElem = contentArea.append('article')
-          .attr('class', type)
-          .attr('id', index)
-          .style({
-            'border-color': '#cccccc',
-            'border-style': 'dashed',
-            'border-width': 'thin',
-            'padding-left': '13px',
-            'padding-right': '7px',
-            'margin-top': '10px',
-            'margin-bottom': '10px',
-          });
-        articleElem.append('div')
-          .text('×')
-          .attr('class', 'content-delete')
-          .style({
-            'cursor': 'pointer',
-            'position': 'relative',
-            'height': '20px',
-            'width': '20px',
-            'left': '98%',
-            'font-size': '25px',
-            'color': 'salmon',
-          })
-          .on('click', function() {
-            // If the content's x is clicked, temporarily hide the HTML and don't delete until saveContent()
-            var contentId = parseInt(this.parentNode.id);
-            // If we're removing a newly added element that hasn't been saved, just delete the node
-            // without worrying about the contents
-            if(!contentId && contentId != 0) {
-              this.parentNode.remove();
-            } else {
-              deleted.push(contentId);
-              this.parentNode.hidden = true;
-            }
-            if(countVisibleContent() == 0) {
-              d3.select('#no-content-msg').style('display', 'block');
-            }
-          });
-        if(type == 'textContent') {
-          articleElem.append('input')
-            .attr('class', 'title')
-            .attr('type', 'text')
-            .property('value', content.title);
-        } else if(type == 'linkContent') {
-          articleElem.append('input')
-            .attr('class', 'title')
-            .attr('type', 'text')
-            .property('value', content.title);
-          articleElem.append('input')
-            .attr('type', 'url')
-            .property('value', content.link);
-        }
-        var textarea = articleElem.append('p').append('textarea');
-        if(type == 'textContent') {
-          textarea.property('value', content.text);
-        } else if(type == 'linkContent') {
-          textarea.property('value', content.description);
-        }
-      };
-
-      var countVisibleContent = function() {
-        var count = 0;
-        for(var i=0; i<contentArea[0][0].children.length; i++) {
-          if(!contentArea[0][0].children[i].hidden) {
-            count++;
-          }
-        }
-        return count;
-      }
-
-      modalElem.append('p')
-        .text("This concept has no content! Click 'Add Content' to add one.")
-        .attr('id', 'no-content-msg');
-
-      contents.forEach(function(content, index) {
-        if(content.link) {
-          article('linkContent', content, index);
-        } else if(content.text) {
-          if(!content.title) {
-            content.title = '';
-          }
-          article('textContent', content, index);
-        }
-      });
-
-      if(countVisibleContent() != 0) {
-        d3.select('#no-content-msg').style('display', 'none');
-      }
-
-      modalElem.append('button')
-        .attr('id', 'addContentBtn')
-        .text('Add Content');
-
-      modalElem.append('button')
-        .attr('id', 'saveBtn')
-        .text('Save');
-
-      modalElem.append('button')
-        .attr('id', 'deleteConceptBtn')
-        .text('Delete Concept');
-
-      var saveContent = function() {
-        // Update the value of whatever was changed in the modal into the graph.
-        var newTitle = d3.select('#title').property('value');
-        concept.name = newTitle;
-        graph.node(conceptId).label = newTitle;
-
-        d3.selectAll('article')[0].forEach(function(articleNode, index) {
-          if(deleted.indexOf(index) < 0) { // if this current index is not marked for deletion
-            if(articleNode.className == 'textContent') {
-              var childNodes = articleNode.childNodes;
-              var contentTitle = d3.select(childNodes[1]).property('value');
-              var childTextNode = childNodes[2].childNodes;
-              var contentText = d3.select(childTextNode[0]).property('value');
-              kg.updateContent(conceptId,
-                index,
-                {
-                  title: contentTitle,
-                  text: contentText
-                });
-            } else if(articleNode.className == 'linkContent') {
-              var childNodes = articleNode.childNodes;
-              var contentUrl = d3.select(childNodes[1]).property('value');
-              var contentTitle = d3.select(childNodes[2]).property('value');
-              var childTextNode = childNodes[3].childNodes;
-              var contentDesc = d3.select(childTextNode[0]).property('value');
-              kg.updateContent(conceptId,
-                index,
-                {
-                  title: contentTitle,
-                  link: contentUrl,
-                  description: contentDesc
-                });
-            }
-          } else { // it is marked for deletion, so remove it from the graph
-            kg.removeContent(conceptId, index);
-          }
-        });
-      };
-
-      d3.select('#addContentBtn').on('click', function() {
-        d3.select('#no-content-msg').style('display', 'none');
-        article('textContent',
-          {
-            title: 'New Content Title',
-            text: 'New Content Text'
-          });
-      });
-
-      d3.select('#saveBtn').on('click', function() {
-        saveContent();
-        kg.render();
-        editModal.close();
-      });
-      
-      d3.select('#deleteConceptBtn').on('click', function() {
-        kg.removeConcept(conceptId);
-        editModal.close();
-      });
-    });
-}
-
-function setupModals(kg) {
-  kg.onEvent('renderGraph', function(e) {
-    addNodeModalEvents(kg, e.graph, e.nodes);
-  });
-};
-
-module.exports = {
-  name: 'editing-modals',
-  run: setupModals,
-};
-
-},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":2}],53:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 var d3 = require('d3');
 
-/*
-Takes node elements and adds functionality for
-replacing label with input element when clicked
+var setupHamburgerNodes = function(km) {
+  km.renderNodes.onNew(function(nodes) {
+    // Create a semi-circle path function
+    var semicircle = d3.svg.arc()
+      .outerRadius(20)
+      .startAngle(3*Math.PI/2)
+      .endAngle(5*Math.PI/2);
 
-Used in addition to the default node rendering function
+    // Add enter/above
+    nodes.filter('.resource').insert('path', 'rect')
+      .attr('d', semicircle)
+      .classed('enter', true);
 
-*/
-function addChangeableLabels(graph, nodes) {
-  var kg = this;
+    // Flip the semi-circle
+    semicircle
+      .startAngle(Math.PI/2)
+      .endAngle(3*Math.PI/2);
 
-  nodes.select('text')
-    .on('click', function(conceptId) {
-      var concept = kg.graph.node(conceptId);
-
-      var text = this;
-      var textgroup = d3.select(this.parentNode);
-
-      // Create the input element
-      var obj = textgroup
-        .append('foreignObject')
-          .attr('width', text.getBBox().width)
-          .attr('height', text.getBBox().height);
-
-      var input = obj
-        .append('xhtml:input')
-          .attr('width', text.getBBox().width)
-          .attr('height', text.getBBox().height)
-          .attr('value', concept.label);
-
-      // Focus element to allow user to immeadiately enter text
-      input[0][0].focus();
-
-      // Change back to text on focus removal
-      input.on('blur', function(conceptId) {
-        // Replace node label
-        concept.label = this.value;
-        concept.concept.name = this.value;
-
-        // Add this back into the graph
-        kg.graph.node(concept.concept.id, concept);
-        kg.render();
-
-        // Remove
-        obj.remove();
-      });
-
-      // Blur if enter key is pressed
-      input.on('keypress', function() {
-        var ENTER_KEY = 13;
-        if (d3.event.keyCode === ENTER_KEY) {
-          input[0][0].blur();
-        }
-      });
-    });
-}
-
-/*
-
-Adds interactivity to hamburger buns. Clicking either bun creates a new node
-and a dependency in the correct order. Dragging from a bun to another node
-creates a dependency between the two.
-
-*/
-function addConnectionEditing(graph, nodes) {
-  var kg = this;
-
-  // Add dragging to join concepts
-  var draggable = nodes.selectAll('path');
-
-  var dragPath;
-  var endConcept;
-  var line = d3.svg.line()
-    .interpolate('bundle');
-
-  // Create dragging behaviour
-  var drag = d3.behavior.drag()
-    .on("dragstart", function(d) {
-      // Stop zooming and ignore mouse-entering this concept
-      d3.event.sourceEvent.stopPropagation();
-
-      // Create a path to drag
-      dragPath = d3.select(this.parentNode)
-        .append('g')
-        .classed('edgePath', true)
-        .attr('pointer-events', 'none')
-          .append('path');
-    })
-    .on("drag", function(d) {
-      // Draw the Path
-      dragPath.attr('d', line([[0,d3.select(this).attr('cy')], [d3.event.x, d3.event.y]]));
-    })
-    .on("dragend", function(d) {
-      // Remove the line
-      dragPath.remove();
-      
-      // Get the concept dragged from
-      var startConcept = kg.graph.node(d).concept;
-
-      // Add the dependency to the graph
-      if (endConcept) {
-        // Get which circle was dragged from
-        var isEnter = d3.select(this).classed('enter');
-        var isExit = d3.select(this).classed('exit');
-
-        // Add a new concept if we didn't drag to another concept
-        if (startConcept.id === endConcept.id) {
-          endConcept = {
-            id: "node-"+kg.graph.nodes().length,
-            name: 'New Concept '+kg.graph.nodes().length,
-          };
-
-          kg.addConcept({concept: endConcept});
-        }
-
-        // Remove the dependency if we are draggin between two concepts
-        // that already have a dependency between them
-        var forward = {concept: startConcept.id, dependency: endConcept.id},
-            backward = {concept: endConcept.id, dependency: startConcept.id};
-        if (kg.hasDependency(forward)) {
-          kg.removeDependency(forward);
-        } else if (kg.hasDependency(backward)) {
-          kg.removeDependency(backward);
-        } else {
-          // Add the dependency according to whether we started dragging
-          // from the enter or exit circle
-          if (isEnter) {
-            kg.addDependency({concept: startConcept, dependency: endConcept.id});
-          } else if (isExit){
-            kg.addDependency({concept: endConcept, dependency: startConcept.id});
-          }
-        }
-      }
-    });
-
-  draggable.call(drag);
-
-  // Set the moused-over objects as the concept to join to
-  nodes
-    .attr('pointer-events', 'mouseover')
-    .on('mouseover', function(d) {
-      endConcept = kg.graph.node(d).concept;
-    })
-    .on('mouseout', function(d) {
-      endConcept = null;
-    });
-
-  return nodes;
-}
-
-function setupEditing(kg) {
-  kg.onEvent('renderGraph', function(e) {
-    addConnectionEditing.call(kg, e.graph, e.nodes);
-    addChangeableLabels.call(kg, e.graph, e.nodes);
+    // Add exit/below
+    nodes.filter('.resource').insert('path', 'rect')
+      .attr('d', semicircle)
+      .classed('exit', true);
   });
-};
+
+  function getTextHeight() {
+    return d3.select(this.parentNode).select('text').node().getBBox().height;
+  }
+
+  km.positionNodes.onUpdate(function(nodes) {
+    nodes.select('path.enter')
+      .attr('transform', function(n) {
+          var textHeight = getTextHeight.call(this);
+          return 'translate(0,' + (-textHeight/2-2) + ')';
+        });
+    nodes.select('path.exit')
+      .attr('transform', function(n) {
+          var textHeight = getTextHeight.call(this);
+          return 'translate(0,' + (textHeight/2+2) + ')';
+        });
+  });
+
+  function nodePosition(node, point) {
+    var x = node.x;
+    var y = node.y;
+    var r = 25;
+
+    var dx = point.x - x;
+    var dy = point.y - y;
+
+    // Length of the line from the circle to the point
+    var l = Math.sqrt(dx*dx + dy*dy);
+    // Unit values
+    var dxu = dx/l;
+    var dyu = dy/l;
+
+    // Offset above/below depending whether the line is up or down
+    var offset = ((dy > 0) ? 1 : -1) * node.height/4;
+
+    return {x: x + dxu*r, y: y + offset + dyu*r}; 
+  }
+
+  /*
+  Rectangle intersection from dagre-d3 source.
+  */
+  function intersectRect(rect, point) {
+    var x = rect.x;
+    var y = rect.y;
+
+    // For now we only support rectangles
+
+    // Rectangle intersection algorithm from:
+    // http://math.stackexchange.com/questions/108113/find-edge-between-two-boxes
+    var dx = point.x - x;
+    var dy = point.y - y;
+    var w = rect.width / 2 + 5;
+    var h = rect.height / 2 + 5;
+
+    var sx, sy;
+    if (Math.abs(dy) * w > Math.abs(dx) * h) {
+      // Intersection is top or bottom of rect.
+      if (dy < 0) {
+        h = -h;
+      }
+      sx = dy === 0 ? 0 : h * dx / dy;
+      sy = h;
+    } else {
+      // Intersection is left or right of rect.
+      if (dx < 0) {
+        w = -w;
+      }
+      sx = w;
+      sy = dx === 0 ? 0 : w * dy / dx;
+    }
+
+    return {x: x + sx, y: y + sy};
+  }
+
+  km.positionEdges.offUpdate(km.defaultUpdateEdgePositions);
+  km.positionEdges.onUpdate(function(edges) {
+    edges.select('path')
+      .attr('d', function(e) {
+        var path = e.layout.points.slice();
+        var source = e.source.layout;
+        var target = e.target.layout;
+
+        var p0 = path.length === 0 ? target : path[0];
+        var p1 = path.length === 0 ? source : path[path.length - 1];
+
+        var f0 = e.source.type === 'concept' ? intersectRect : nodePosition;
+        var f1 = e.target.type === 'concept' ? intersectRect : nodePosition;
+        path.unshift(f0(source, p0));
+        path.push(f1(target, p1));
+
+        return d3.svg.line()
+          .x(function(d) { return d.x; })
+          .y(function(d) { return d.y; })
+          .interpolate('basis')
+          (path);
+      });
+  });
+}
 
 module.exports = {
-  name: 'editing',
-  run: setupEditing
+  name: 'hamburger-nodes',
+  run: setupHamburgerNodes
 };
 
-},{"d3":2}],54:[function(require,module,exports){
-(function (global){
-"use strict";
-
-var dagreD3 = require('dagre-d3');
-var d3 = require('d3');
-
-/*
-
-Given a JSON object with the knowledge data, create a graph object which
-will be rendered by dagre-d3.
-
-json: TODO describe what the json should look like
-
-*/
-var createGraph = function(json) {
-  var graph = new dagreD3.Digraph();
-
-  if (json && json.concepts) {
-    // Add all the concepts as nodes
-    json.concepts.forEach(function(concept) {
-      graph.addNode(concept.id, {
-       label: concept.name,
-       concept: concept,
-      });
-    });
-    // Check each concept for dependencies and add them as edges
-    json.concepts.forEach(function(concept) {
-      if (Array.isArray(concept.dependencies)) {
-        concept.dependencies.forEach(function(dep) {
-          // Add an edge from the dependency to the concept with a null edge ID
-          graph.addEdge(dep+'-'+concept.id, dep, concept.id);
-        });
-      } else {
-        // Dependencies is undefine/not an array and we'll figure out what to do with it later
-      }
-    });
-  }
-
-  return graph;
-};
-
-/*
-
-Creates the points for the paths that make up the edges
-Offsets the in/out edges to above/below given nodes
-
-Replaces the default dagre-d3 PositionEdgePaths function
-*/
-function positionEdgePaths(g, svgEdgePaths) {
-  // Add an ID to each edge
-  svgEdgePaths
-    .attr('id', function(d) { return d; });
-
-  var interpolate = this._edgeInterpolate,
-      tension = this._edgeTension;
-
-  function calcPoints(e) {
-    var value = g.edge(e);
-    var source = g.node(g.incidentNodes(e)[0]);
-    var target = g.node(g.incidentNodes(e)[1]);
-    var points = value.points.slice();
-
-    var p0 = points.length === 0 ? target : points[0];
-    var p1 = points.length === 0 ? source : points[points.length - 1];
-
-    points.unshift(nodePosition(source, p0));
-    points.push(nodePosition(target, p1));
-
-    return d3.svg.line()
-      .x(function(d) { return d.x; })
-      .y(function(d) { return d.y; })
-      .interpolate(interpolate)
-      .tension(tension)
-      (points);
-  }
-
-  svgEdgePaths.filter('.enter').selectAll('path')
-      .attr('d', calcPoints);
-
-  this._transition(svgEdgePaths.selectAll('path'))
-      .attr('d', calcPoints)
-      .style('opacity', 1);
-}
-
-function nodePosition(node, point) {
-  var x = node.x;
-  var y = node.y;
-  var r = 25;
-  
-  var dx = point.x - x;
-  var dy = point.y - y;
-
-  // Length of the line from the circle to the point
-  var l = Math.sqrt(dx*dx + dy*dy);
-  // Unit values
-  var dxu = dx/l;
-  var dyu = dy/l;
-
-  // Offset above/below depending whether the line is up or down
-  var offset = ((dy > 0) ? 1 : -1) * node.height/4;
-
-  return {x: x + dxu*r, y: y + offset + dyu*r}; 
-}
-
-/*
-
-Adds entry and exit points for edges into concept elements
-
-Used in addition to the default node rendering function
-
-*/
-function drawHamburgers(graph, nodes) {
-  var kg = this;
-
-  // Create a semi-circle path function
-  var semicircle = d3.svg.arc()
-    .outerRadius(20)
-    .startAngle(3*Math.PI/2)
-    .endAngle(5*Math.PI/2);
-
-  // Add enter/above
-  var enter = nodes.insert('path', 'rect')
-    .classed('enter', true)
-    .attr('d', semicircle)
-    .attr('transform', function() {
-      return 'translate(0,' + (-nodes.selectAll('rect').attr('height')/2) + ')';
-    });
-
-  // Flip the semi-circle
-  semicircle
-    .startAngle(Math.PI/2)
-    .endAngle(3*Math.PI/2);
-  
-  // Add exit/below
-  var exit = nodes.insert('path', 'rect')
-    .classed('exit', true)
-    .attr('d', semicircle)
-    .attr('transform', function() {
-      return 'translate(0,' + (nodes.selectAll('rect').attr('height')/2) + ')';
-    });
-}
-
-/*
-
-Construct a knowledge map object.
-
-Accepts a single object:
-  config: an object that contains the data about the graph and various other
-  options
-  The available options are:
-    graph: a JSON object that contains the graph data
-    plugins: a list of plugin names or plugin objects
-
-*/
-var KnowledgeMap = function(api, config) {
-  config = config || {};
-
-  // Create the directed graph
-  var graph = this.graph = createGraph(config.graph);
-
-  // Create an element on the page for us to render our graph in
-  var parentName = config.inside || 'body';
-  var element = this.element = d3.select(parentName).append('svg');
-
-  // Use dagre-d3 to render the graph
-  var renderer = this.renderer = new dagreD3.Renderer();
-  var layout   = this.layout   = dagreD3.layout().rankSep(50);
-  if (config.layout) {
-    if (config.layout.verticalSpace)   layout.rankSep(config.layout.verticalSpace);
-    if (config.layout.horizontalSpace) layout.nodeSep(config.layout.horizontalSpace);
-    if (config.layout.direction)       layout.rankDir(config.layout.direction);
-  }
-
-  // Update the way edges are positioned
-  renderer.layout(layout);
-  renderer.positionEdgePaths(positionEdgePaths);
-
-  // Add transitions for graph updates
-  renderer.transition(function(selection) {
-    var duration;
-    if (config && config.transitionDuration !== undefined) {
-      duration = config.transitionDuration;
-    } else {
-      duration = 500;
-    }
-
-    if (duration) {
-      return selection
-        .transition()
-          .duration(duration);
-    } else {
-      return selection;
-    }
-  });
-
-  // Add enter/exit circles
-  var kg = this;
-  var drawNodes = renderer.drawNodes();
-  renderer.drawNodes(function(graph, element) {
-    var nodes = drawNodes(graph, element);
-
-    // Add class labels
-    nodes.attr('id', function(d) { return d; });
-
-    // Add burger buns
-    drawHamburgers.call(kg, graph, nodes);
-
-    // Add interactivity
-    kg.postEvent({
-      type: 'renderGraph',
-      graph: graph,
-      nodes: nodes
-    });
-
-    return nodes;
-  });
-
-  /*
-  Message API
-  */
-  this.dispatcher = {};
-
-  this.postEvent = function(e) {
-    if(this.dispatcher[e.type]) {
-      var callbacks = this.dispatcher[e.type];
-      callbacks.forEach(function(callback) {
-        callback(e);
-      });
-    }
-  };
-
-  this.onEvent = function(type, callback) {
-    if(undefined === this.dispatcher[type]) {
-      this.dispatcher[type] = [];
-    }
-    this.dispatcher[type].push(callback);
-  };
-
-  /*
-  Adds a concept to the graph and then updates the graph rendering
-
-  config:
-    concept: The concept object to add
-    dependents: A list of concept ids dependent on this one
-  */
-  this.addConcept = function(config) {
-    var kg = this;
-
-    // Add node to the graph
-    this.graph.addNode(config.concept.id, {
-      label: config.concept.name,
-      concept: config.concept,
-    });
-
-    // Add dependent edges to the graph
-    if (config.dependents) {
-      config.dependents.forEach(function(dep) {
-        kg.addDependency({
-          concept: kg.graph.node(dep).concept,
-          dependency: config.concept.id,
-        });
-      });
-    }
-
-    // Add dependency edges to the graph
-    if (config.concept.dependencies) {
-      config.concept.dependencies.forEach(function(dep) {
-        kg.addDependency({
-          concept: config.concept,
-          dependency: dep,
-        });
-      });
-    }
-
-    // Update the graph display
-    this.render();
-  };
-
-  /*
-
-  Adds a dependency to the graph and then updates the graph rendering
-
-  config:
-    concept: the concept which depends on another concept
-    dependency: the id of the concept which is depended on
-
-  */
-  this.addDependency = function(config) {
-    // Get ids of the concepts
-    var concept = config.concept;
-    var dep = config.dependency;
-
-    // Add the dependency to the list of the concept's dependencies
-    if (concept.dependencies && concept.dependencies.indexOf(dep) === -1) {
-      concept.dependencies.push(dep);
-    } else {
-      concept.dependencies = [dep];
-    }
-
-    // Add the edge to the graph
-    this.graph.addEdge(dep+'-'+concept.id, dep, concept.id);
-
-    // Update the graph display
-    this.render();
-  };
-
-  /*
-
-  Removes a dependency from the graph and then updates the graph rendering
-
-  */
-  this.removeDependency = function(config) {
-    // Get ids of concepts
-    var con = config.concept;
-    var dep = config.dependency;
-
-    // Remove the dependency from the concept
-    var concept = this.graph.node(con).concept;
-    if (concept.dependencies) {
-      var index = concept.dependencies.indexOf(dep);
-      concept.dependencies.splice(index, 1);
-    }
-
-    // Remove the edge from the graph
-    this.graph.delEdge(dep+'-'+con);
-
-    // Update the graph display
-    this.render();
-  };
-
-  /*
-  
-  Returns true if the graph has this dependency and false otherwise
-
-  */
-  this.hasDependency = function(config) {
-    // Get ids of concepts
-    var concept = config.concept;
-    var dep = config.dependency;
-
-    // Return true if edge exists
-    return this.graph.hasEdge(dep+'-'+concept);
-  };
-
-  /*
-
-  Renders/rerenders the graph elements
-
-  */
-  this.render = function() {
-    // Run the renderer
-    this.renderer.run(this.graph, this.element);
-  };
-
-  /*
-
-  Outputs the graph as a JSON object
-
-  */
-  this.toJSON = function() {
-    var json = {
-      concepts: [],
-    };
-
-    // Add all of the concepts
-    this.graph.eachNode(function(id, node) {
-      json.concepts.push(node.concept);
-    });
-
-    return JSON.stringify(json);
-  };
-  
-  /*
-
-  Deletes a concept from the graph
-
-  */
-  this.removeConcept = function(conceptId) {
-    var kg = this;
-    var concept = kg.graph.node(conceptId).concept;
-
-    // Remove all links to concepts that this one depends on
-    if(concept.dependencies) {
-      concept.dependencies.forEach(function(dependency) {
-        kg.removeDependency({
-          concept: conceptId,
-          dependency: dependency,
-        });
-      });
-    }
-
-    // Remove all links to concepts that depend on this
-    var dependants = kg.getDependants(conceptId);
-    if(dependants.length) {
-      dependants.forEach(function(dependant) {
-        kg.removeDependency({
-          concept: dependant,
-          dependency: conceptId,
-        });
-      });
-    }
-
-    // Remove the node
-    kg.graph.delNode(conceptId);
-
-    // Update the display
-    this.render();
-  };
-
-  /*
-
-  Return a list of IDs of concepts that depend on a given concept, i.e.
-  have this concept as a dependency
-
-  */
-  this.getDependants = function(conceptId) {
-    return this.graph.successors(conceptId);
-  };
-
-  /*
-
-  Add a piece of content to a concept
-
-  */
-  this.addContent = function(conceptId, content) {
-    var concept = this.graph.node(conceptId).concept;
-    if(concept.content) {
-      concept.content.push(content);
-    } else {
-      concept.content = [content];
-    }
-  };
-
-  /*
-
-  Update a piece of content in a concept
-
-  */
-  this.updateContent = function(conceptId, contentIndex, content) {
-    var concept = this.graph.node(conceptId).concept;
-    if(contentIndex >= concept.content.length) {
-      this.addContent(conceptId, content);
-    } else {
-      concept.content[contentIndex] = content;
-    }
-  };
-
-  /*
-
-  Remove a piece of content from a concept
-
-  */
-  this.removeContent = function(conceptId, contentIndex) {
-    var concept = this.graph.node(conceptId).concept;
-    concept.content.splice(contentIndex, 1);
-  };
-
-  // Initialise plugins for graph.
-  if(config && config.plugins) {
-    for(var i = 0; i < config.plugins.length; i++) {
-      var plugin = config.plugins[i];
-      if('string' === typeof(plugin)) {
-        plugin = api.plugins[plugin];
-      }
-      if(plugin && plugin.run) {
-        plugin.run(this);
-      }
-    }
-    this.__defineGetter__('plugins', function() {
-      return config.plugins;
-    });
-    this.__defineSetter__('plugins', function() {});
-  }
-
-  // Display the graph
-  this.render();
-
-  return this;
-};
-
-/*
-
-Public API for the knowledge-map library
-
-*/
-var api = {
-  /*
-
-  Create a knowledge map display that layouts out the entire graph.
-
-  */
-  create: function(config) {
-    return new KnowledgeMap(this, config);
-  },
-
-  plugins: {
-    'links': require('./links-plugin.js'),
-    'editing': require('./editing-plugin.js'),
-    'modals': require('./modals-plugin.js'),
-    'editing-modals': require('./editing-modals-plugin.js'),
-    'click-events': require('./click-events-plugin.js'),
-  },
-
-  registerPlugin: function(plugin) {
-    if(plugin && plugin.name && plugin.run) {
-      this.plugins[plugin.name] = plugin;
-    }
-  }
-};
-
-global.knowledgeMap = api; 
-module.exports = api;
-
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./click-events-plugin.js":51,"./editing-modals-plugin.js":52,"./editing-plugin.js":53,"./links-plugin.js":55,"./modals-plugin.js":56,"d3":2,"dagre-d3":3}],55:[function(require,module,exports){
-var d3 = require('d3');
-
-function addNodeLinks(graph, nodes) {
-  // Add links for each node
-  nodes.each(function(conceptId) {
-    // Get the concept object
-    var concept = graph.node(conceptId).concept;
-
-    var content = concept.content;
-
-    if (content && content.link) {
-      // Create an anchor tag to insert the node labels into
-      var anchor = document.createElementNS('http://www.w3.org/2000/svg', 'a');
-      this.parentNode.appendChild(anchor);
-
-      // Set the link target
-      anchor.setAttributeNS('http://www.w3.org/1999/xlink',
-                            'href', content.link);
-
-      // Insert the labels into the anchor tag
-      anchor.appendChild(this);
-    }
-  });
-
-  return nodes;
-}
-
-function setupLinks(kg) {
-  kg.onEvent('renderGraph', function(e) {
-    addNodeLinks.call(kg, e.graph, e.nodes);
-  });
-};
-
-module.exports = {
-  name: 'links',
-  run: setupLinks,
-};
-
-},{"d3":2}],56:[function(require,module,exports){
-var d3 = require('d3');
-var modal = require('../node_modules/PicoModal/src/picoModal.js');
-
-function addNodeModalEvents(graph, nodes) {
-  nodes
-    .on('click', function(conceptId) {
-      var concept = graph.node(conceptId).concept;
-      var contents = concept.content;
-      if(!contents || !contents.forEach) {
-        return;
-      }
-
-      var getHost = function(url) {
-        var a = document.createElement('a');
-        a.href = url;
-        return a.hostname;
-      }
-
-      var editModal = modal({
-        content: '',
-        width: 700,
-        closeButton: true,
-      });
-
-      var modalElem = d3.select(editModal.modalElem)
-        .style('overflow-y', 'scroll')
-        .style('max-height', '500px')
-        .style('background-color', 'white')
-        .style('padding', '20px');
-
-      modalElem.append('h1').text(concept.name);
-
-      if(!contents.length) {
-        // Naww :(
-        modalElem.append('p').text('This node has no content!');
-      } else {
-        // Render each content item.
-        contents.forEach(function(content) {
-          if(content.link) {
-            var hostname = getHost(content.link);
-            var article = modalElem.append('article').attr('class', 'link');
-            var header = article.append('header');
-            header.append('a').attr('href', content.link).text(content.title);
-            header.append('span').text(hostname);
-            article.append('p').html(content.description);
-          } else if(content.text) {
-            var article = modalElem.append('article').attr('class', 'text');
-            if(content.title) {
-              article.append('h2').text(content.title);
-            }
-            article.append('p').html(content.text);
-          }
-        });
-      }
-    });
-}
-
-function setupModals(kg) {
-  kg.onEvent('renderGraph', function(e) {
-    addNodeModalEvents.call(kg, e.graph, e.nodes);
-  });
-};
-
-module.exports = {
-  name: 'modals',
-  run: setupModals,
-};
-
-},{"../node_modules/PicoModal/src/picoModal.js":1,"d3":2}]},{},[54])
+},{"d3":2}]},{},[1]);
