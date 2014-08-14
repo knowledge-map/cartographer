@@ -5,6 +5,7 @@
     "type": "git",
     "url": "https://github.com/knowledge-map/cartographer.git"
   },
+  "main": "src/knowledge-map.js",
   "devDependencies": {
     "browserify": "",
     "watchify": "~0.6",
