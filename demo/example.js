@@ -54,13 +54,26 @@ var resources = [
 // Create graph that visualises the knowledge
 var km = knowledgeMap.create({
   resources: resources,
-  plugins: ['hamburger-nodes'],
+  plugins: [
+    'hamburger-nodes',
+    function(km) {
+      km.renderNodes.onNew(function(nodes) {
+        nodes
+          .select('text')
+          .on('click', function (node) {
+            if('resource' === node.type) {
+              km.removeResource(node);
+            }
+          });
+      });
+    },
+    function(km) {
+      km.onPreLayout(function(config) {
+        config.rankSep(75);
+      });
+    }
+  ]
 });
-
-km.onPreLayout(function(config) {
-  config.rankSep(75);
-});
-km.render();
 
 km.defineConcept({
   id: 'what-a-knowledge-map-is',
