@@ -181,3 +181,64 @@ describe('Removing a resource from the knowledge map', function() {
     expect(km.graph.hasNode(concept2.id)).toBe(false);
   });
 });
+
+describe('Rendering a knowledge map', function() {
+  var km;
+  beforeEach(function() {
+    km = knowledgeMap.create();
+  });
+
+  it('should send layout callbacks', function() {
+    var preLayoutSpy = jasmine.createSpy('preLayout spy');
+    var postLayoutSpy = jasmine.createSpy('postLayout spy');
+    km.onPreLayout(preLayoutSpy);
+    km.onPostLayout(postLayoutSpy);
+    km.render();
+    expect(preLayoutSpy).toHaveBeenCalled();
+    expect(postLayoutSpy).toHaveBeenCalled();
+  });
+
+  it('should not render when held', function() {
+    var preLayoutSpy = jasmine.createSpy('preLayout spy');
+    var postLayoutSpy = jasmine.createSpy('postLayout spy');
+    km.onPreLayout(preLayoutSpy);
+    km.onPostLayout(postLayoutSpy);
+    km.hold().render();
+    expect(preLayoutSpy).not.toHaveBeenCalled();
+    expect(postLayoutSpy).not.toHaveBeenCalled();
+    km.unhold().render();
+    expect(preLayoutSpy).toHaveBeenCalled();
+    expect(postLayoutSpy).toHaveBeenCalled();
+  });
+
+  it('should render nodes', function() {
+    var newNodeSpy = jasmine.createSpy('newNode spy');
+    var updateNodeSpy = jasmine.createSpy('updateNode spy');
+    km.renderNodes.onNew(newNodeSpy);
+    km.renderNodes.onUpdate(updateNodeSpy);
+    km.render();
+    expect(newNodeSpy).toHaveBeenCalled();
+    expect(updateNodeSpy).toHaveBeenCalled();
+  });
+
+  it('should position nodes', function() {
+    var positionNodeSpy = jasmine.createSpy('positionNode spy');
+    km.positionNodes.onUpdate(positionNodeSpy);
+    km.render();
+    expect(positionNodeSpy).toHaveBeenCalled();
+  });
+
+  it('should render edges', function() {
+    var newEdgeSpy = jasmine.createSpy('newEdge spy');
+    km.renderEdges.onNew(newEdgeSpy);
+    km.render();
+    expect(newEdgeSpy).toHaveBeenCalled();
+  });
+
+  it('should position edges', function() {
+    var positionEdgeSpy = jasmine.createSpy('positionEdge spy');
+    km.positionEdges.onUpdate(positionEdgeSpy);
+    km.render();
+    expect(positionEdgeSpy).toHaveBeenCalled();
+  });
+});
