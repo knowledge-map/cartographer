@@ -45,7 +45,7 @@ describe('Adding a resource to a knowledge map', function() {
   it('should add a new graph node', function() {
     var id = km.addResource(sampleResource);
     expect(id).toEqual(sampleResource.id);
-    expect(km.graph.node(id)).toBeDefined();
+    expect(km.graph.hasNode(id)).toBe(true);
     expect(km.graph.node(id).label).toEqual(sampleResource.label);
     expect(km.graph.node(id).type).toEqual('resource');
   });
@@ -60,7 +60,7 @@ describe('Adding a resource to a knowledge map', function() {
     var label = 'Hello you';
     var id = km.addResource(label);
     expect(id).toEqual('hello-you');
-    expect(km.graph.node(id)).toBeDefined();
+    expect(km.graph.hasNode(id)).toBe(true);
     expect(km.graph.node(id).label).toEqual(label);
     expect(km.graph.node(id).type).toEqual('resource');
   });
@@ -73,8 +73,8 @@ describe('Adding a resource to a knowledge map', function() {
       label: 'Hello',
       teaches: [concept1, concept2]
     });
-    expect(km.graph.node(concept1)).toBeDefined();
-    expect(km.graph.node(concept2.id)).toBeDefined();
+    expect(km.graph.hasNode(concept1)).toBe(true);
+    expect(km.graph.hasNode(concept2.id)).toBe(true);
   });
 
   it('should add any concepts it requires', function() {
@@ -85,8 +85,8 @@ describe('Adding a resource to a knowledge map', function() {
       label: 'Hello',
       requires: [concept1, concept2]
     });
-    expect(km.graph.node(concept1)).toBeDefined();
-    expect(km.graph.node(concept2.id)).toBeDefined();
+    expect(km.graph.hasNode(concept1)).toBe(true);
+    expect(km.graph.hasNode(concept2.id)).toBe(true);
   });
 });
 
@@ -104,7 +104,7 @@ describe('Adding a concept to the knowledge map', function() {
   it('should create a new graph node', function() {
     var id = km.defineConcept(sampleConcept);
     expect(id).toEqual(sampleConcept.id);
-    expect(km.graph.node(id)).toBeDefined();
+    expect(km.graph.hasNode(id)).toBe(true);
     expect(km.graph.node(id).label).toEqual(sampleConcept.label);
     expect(km.graph.node(id).type).toEqual('concept');
   });
@@ -119,7 +119,8 @@ describe('Adding a concept to the knowledge map', function() {
     var label = 'Hello you';
     var id = km.defineConcept(label);
     expect(id).toEqual('hello-you');
-    expect(km.graph.node(id)).toBeDefined();
+    expect(km.graph.hasNode(id)).toBe(true);
+    expect(km.graph.hasNode(label)).toBe(false);
     expect(km.graph.node(id).label).toEqual(label);
     expect(km.graph.node(id).type).toEqual('concept');
   });
