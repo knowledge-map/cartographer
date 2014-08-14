@@ -138,8 +138,8 @@ describe('Removing a resource from the knowledge map', function() {
   var concept1, concept2;
   beforeEach(function() {
     km = knowledgeMap.create();
-    concept1 = 'this';
-    concept2 = {id: 'that', label: 'That'};
+    concept1 = 'This is';
+    concept2 = {id: 'that-is', label: 'That is'};
     sampleResource = {
       id: 'sample-resource',
       label: 'Sample resource',
@@ -171,13 +171,13 @@ describe('Removing a resource from the knowledge map', function() {
     };
     var id1 = km.addResource(sampleResource);
     var id2 = km.addResource(sampleResource2);
-    expect(km.graph.hasNode(concept1)).toBe(true);
+    expect(km.graph.hasNode('this-is')).toBe(true);
     expect(km.graph.hasNode(concept2.id)).toBe(true);
     km.removeResource(sampleResource);
-    expect(km.graph.hasNode(concept1)).toBe(true);
+    expect(km.graph.hasNode('this-is')).toBe(true);
     expect(km.graph.hasNode(concept2.id)).toBe(true);
     km.removeResource(sampleResource2);
-    expect(km.graph.hasNode(concept1)).toBe(false);
+    expect(km.graph.hasNode('this-is')).toBe(false);
     expect(km.graph.hasNode(concept2.id)).toBe(false);
   });
 });

@@ -324,24 +324,17 @@ var KnowledgeMap = function(api, config) {
 
       // Remove concept nodes with no more incident edges.
       var self = this;
-      var remove = function(id) {
-        if('string' !== typeof(id)) {
-          id = id.id;
-        }
-        if(!self.graph.incidentEdges(id).length) {
-          self.graph.delNode(id);
+      var removeConcept = function(id) {
+        id = self.defineConcept(id);
+        if(self.graph.hasNode(id)) {
+          if(!self.graph.incidentEdges(id).length) {
+            self.graph.delNode(id);
+          }
         }
       };
-      if(resource.teaches) {
-        resource.teaches.forEach(function(c) {
-          remove(c);
-        });
-      }
-      if(resource.requires) {
-        resource.requires.forEach(function(c) {
-          remove(c);
-        });
-      }
+
+      if(resource.teaches) { resource.teaches.forEach(removeConcept); }
+      if(resource.requires) { resource.requires.forEach(removeConcept); }
     }
 
     this.render();
