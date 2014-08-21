@@ -368,6 +368,17 @@ var KnowledgeMap = function(api, config) {
   };
 
   /*
+  Calculate the dimensions of each node after the elements have been rendered
+  into the page.
+  */
+  this.calculateNodeSizes = function(nodes) {
+    nodes.each(function(d) {
+      d.width = this.getBBox().width;
+      d.height = this.getBBox().height;
+    });
+  };
+
+  /*
   Sets node labels.
   */
   this.defaultUpdateNodes = function(nodes) {
@@ -428,6 +439,7 @@ var KnowledgeMap = function(api, config) {
     .make(function(e) { return e.append('g'); })
     .useClass('node')
     .onNew(this.defaultNewNodes)
+    .onUpdate(this.calculateNodeSizes)
     .onUpdate(this.defaultUpdateNodes);
 
   this.positionNodes = new Renderer()
@@ -466,12 +478,6 @@ var KnowledgeMap = function(api, config) {
       return self.graph.node(id);
     });
     var result = this.renderNodes.run(this.nodes);
-
-    // Add width and height information from the SVG elements.
-    result.data.each(function(d) {
-      d.width = this.getBBox().width;
-      d.height = this.getBBox().height;
-    });
 
     // Generate a graph layout and render it.
     var config = dagre.layout();

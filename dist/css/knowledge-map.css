@@ -3,7 +3,6 @@ svg {
   height: 800px;
 }
 text {
-  font-family: 'Fira', sans-serif;
   fill: #000000;
 }
 .node {
@@ -38,7 +37,6 @@ svg {
   height: 800px;
 }
 text {
-  font-family: 'Fira', sans-serif;
   fill: #000000;
 }
 .node {

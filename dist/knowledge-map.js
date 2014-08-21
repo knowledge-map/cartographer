@@ -1,590 +1,4 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-(function (global){
-"use strict";
-
-var d3 = require('d3');
-var dagre = require('dagre');
-
-/**
- Call this on an object to define a 'callback' handler with lots of boilerplate
- functionality taken care of. There will be three new methods on this object,
- where Name is the name you give the callback:
-
-   doName - calls all the callback handlers assigned to this callback, passing
-            them the arguments passed to it.
-   onName - registers a handler for this callback.
-   offName - removes a callback handler for this callback.
-
- For example:
-
-  var myObject = {callbacks: []};
-  callback.call(myObject, 'update');
-  var updateHandler = function(arg) {
-    console.log('Object updated and says: ' + arg);
-  };
-  myObject.onUpdate(updateHandler);
-  myObject.doUpdate('hello!');
-  myObject.offUpdate(updateHandler);
-  myObject.doUpdate('you won't see this!');
-
- */
-function callback(name) {
-  if(!this.callbacks) {
-    this.callbacks = {};
-  }
-  this.callbacks[name] = [];
-  var capName = name[0].toUpperCase() + name.slice(1);
-
-  this['do' + capName] = function() {
-    var args = Array.prototype.slice.call(arguments);
-    var self = this;
-    this.callbacks[name].forEach(function(cb) { cb.apply(self, args); });
-  };
-
-  this['on' + capName] = function(cb) {
-    this.callbacks[name].push(cb);
-    return this;
-  };
-
-  this['off' + capName] = function(cb) {
-    var idx = this.callbacks[name].indexOf(cb);
-    if(-1 !== idx) {
-      this.callbacks[name].splice(idx, 1);
-    }
-    return this;
-  };
-}
-
-function property(store, access) {
-  this[store] = undefined;
-  this[access] = function(val) {
-    if(undefined === val) {
-      return this[store];
-    } else {
-      this[store] = val;
-      return this;
-    }
-  };
-}
-
-function Renderer() {
-  callback.call(this, 'new');
-  callback.call(this, 'update');
-
-  property.call(this, '_into', 'into');
-  property.call(this, 'cls', 'useClass');
-  property.call(this, 'rowKey', 'key');
-  property.call(this, 'makeRows', 'make');
-
-  this.run = function (data) {
-    function error(message) {
-      throw message;
-    }
-
-    var row = this.cls || 'km-row';
-
-    var rows = this.into().selectAll('.' + row);
-    var rowData = rows.data(data, this.rowKey);
-    rowData.exit().remove();
-
-    var newRows;
-    if(this.makeRows) {
-      newRows = this.makeRows(rowData.enter());
-    } else if(this.cls) {
-      newRows = rowData.enter().select(this.cls);
-    } else {
-      error('makeColumn did not return a selection');
-    }
-    newRows.classed(row, true);
-
-    this.doNew(newRows);
-    this.doUpdate(rowData);
-
-    return {data: rowData, enter: newRows};
-  };
-}
-
-/*
-Rectangle intersection from dagre-d3 source.
-*/
-function intersectRect(rect, point) {
-  var x = rect.x;
-  var y = rect.y;
-
-  // For now we only support rectangles
-
-  // Rectangle intersection algorithm from:
-  // http://math.stackexchange.com/questions/108113/find-edge-between-two-boxes
-  var dx = point.x - x;
-  var dy = point.y - y;
-  var w = rect.width / 2;
-  var h = rect.height / 2;
-
-  var sx, sy;
-  if (Math.abs(dy) * w > Math.abs(dx) * h) {
-    // Intersection is top or bottom of rect.
-    if (dy < 0) {
-      h = -h;
-    }
-    sx = dy === 0 ? 0 : h * dx / dy;
-    sy = h;
-  } else {
-    // Intersection is left or right of rect.
-    if (dx < 0) {
-      w = -w;
-    }
-    sx = w;
-    sy = dx === 0 ? 0 : w * dy / dx;
-  }
-
-  return {x: x + sx, y: y + sy};
-}
-
-/*
- * Create a graph from a config. At the moment, only a list of resources is used
- * to build the graph.
- */
-function createGraph(config) {
-  this.hold();
-  if (config && config.resources) {
-    var self = this;
-    config.resources.forEach(function(r) {
-      self.addResource(r);
-    });
-  }
-  this.unhold();
-  return this;
-}
-
-function setupSVG(config) {
-  // Create elements on the page for us to render our graph in
-  var parentName = config.inside || 'body';
-  var svg = d3.select(parentName).append('svg');
-  var root = svg.append('g');
-
-  // Define the #arrowhead shape for use with edge paths.
-  svg.append('svg:defs')
-    .append('svg:marker')
-      .attr('id', 'arrowhead')
-      .attr('viewBox', '0 0 10 10')
-      .attr('refX', 8)
-      .attr('refY', 5)
-      .attr('markerUnits', 'strokeWidth')
-      .attr('markerWidth', 8)
-      .attr('markerHeight', 5)
-      .attr('orient', 'auto')
-      .attr('style', 'fill: #333')
-      .append('svg:path')
-        .attr('d', 'M 0 0 L 10 5 L 0 10 z');
-
-  // Add a 'backstop' so we can catch pointer events on the entire SVG.
-  root.append('rect')
-      .attr('class', 'overlay')
-      .attr('width', '100%')
-      .attr('height', '100%')
-      .style('fill', 'none')
-      .style('pointer-events', 'all');
-
-  // Make zoomable.
-  var el = this.element = root.append('g');
-  var self = this;
-
-  callback.call(this, 'zoom');
-  callback.call(this, 'zoomSetup');
-  this.zoom = d3.behavior.zoom();
-  root.call(this.zoom.on("zoom", function () {
-    self.doZoom(this.zoom);
-  }));
-
-  this.defaultZoomSetup = function(zoom) {
-    zoom.scaleExtent([0.3, 1]);
-  };
-  this.onZoomSetup(this.defaultZoomSetup);
-  this.defaultOnZoom = function() {
-    el.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
-  };
-  this.onZoom(this.defaultOnZoom);
-
-  // Groups for node and edge SVG elements.
-  this.edgeContainer = this.element.append('g').classed('edges', true);
-  this.nodeContainer = this.element.append('g').classed('nodes', true);
-}
-
-/*
-Construct a knowledge map object.
-
-Accepts a single object:
-  config: an object that contains the data about the graph and various other
-  options
-  The available options are:
-    graph: a JSON object that contains the graph data
-    plugins: a list of plugin names or plugin objects
-*/
-var KnowledgeMap = function(api, config) {
-  config = config || {};
-
-  /*
-  Hold API
-  */
-  var held    = !!config.held;
-  this.hold   = function() { held = true; return this; }
-  this.unhold = function() { held = false; return this; }
-  this.held   = function() { return held; }
-
-  /*
-   * Resource API
-   */
-  this.addResource = function(resource) {
-    // Just for uniformity of API, allow a single string to create a named
-    // resource. This will never be useful.
-    if('string' === typeof(resource)) {
-      resource = {
-        id: resource.toLowerCase().replace(/ /g, '-'),
-        label: resource,
-        type: 'resource',
-        content: {},
-        teaches: [],
-        requires: [],
-        needs: []
-      };
-    } else {
-      resource = {
-        id: resource.id || resource.label.toLowerCase().replace(/ /g, '-'),
-        label: resource.label,
-        type: 'resource',
-        content: resource.content || {},
-        teaches: resource.teaches || [],
-        requires: resource.requires || [],
-        needs: resource.needs || []
-      };
-    }
-
-    // Add the resource to the graph as a node.
-    this.graph.addNode(resource.id, resource);
-
-    // Deal with all the dependencies. Add new concepts and assets where
-    // necessary, and add edges in the appropriate direction.
-    var self = this;
-    var id = resource.id;
-
-    // X-teaches-Y is an arrow from resource X to concept Y.
-    if(resource.teaches) {
-      resource.teaches.forEach(function(c) {
-        var cid = self.defineConcept(c);
-        self.graph.addEdge(id+'-teaches-'+cid, id, cid);
-      });
-    }
-
-    // Y-requires-X is an arrow from concept Y to resource X.
-    if(resource.requires) {
-      resource.requires.forEach(function(c) {
-        var cid = self.defineConcept(c);
-        self.graph.addEdge(id+'-requires-'+cid, cid, id);
-      });
-    }
-
-    if(resource.needs) {
-      resource.needs.forEach(function(a) {
-        //var aid = self.defineAsset(a);
-      });
-    }
-
-    this.render();
-    return id;
-  };
-
-  this.removeResource = function(resourceId) {
-    if('string' !== typeof(resourceId)) {
-      resourceId = resourceId.id;
-    }
-
-    if(this.graph.hasNode(resourceId)) {
-      // Remove resource node and all edges.
-      var resource = this.graph.node(resourceId);
-      this.graph.delNode(resourceId);
-
-      // Remove concept nodes with no more incident edges.
-      var self = this;
-      var removeConcept = function(id) {
-        id = self.defineConcept(id);
-        if(self.graph.hasNode(id)) {
-          if(!self.graph.incidentEdges(id).length) {
-            self.graph.delNode(id);
-          }
-        }
-      };
-
-      if(resource.teaches) { resource.teaches.forEach(removeConcept); }
-      if(resource.requires) { resource.requires.forEach(removeConcept); }
-    }
-
-    this.render();
-  };
-
-  /**
-   Define a concept object that will be included in the graph. If a string is
-   passed, a new concept object will be created. The string is treated as the
-   label of the concept, and converted into a correct ID. If an object is passed,
-   the object will replace the contents of any existing concept with the same ID.
-  */
-  this.defineConcept = function(concept) {
-    var replace = true;
-    if('string' === typeof(concept)) {
-      replace = false;
-      concept = {
-        id: concept.toLowerCase().replace(/ /g, '-'),
-        label: concept,
-        type: 'concept',
-        content: {}
-      };
-    } else {
-      concept = {
-        id: concept.id || concept.label.toLowerCase().replace(/ /g, '-'),
-        label: concept.label,
-        type: 'concept',
-        content: concept.content || {}
-      };
-    }
-
-    if(!this.graph.hasNode(concept.id)) {
-      this.graph.addNode(concept.id, concept);
-      this.render();
-    } else if(replace) {
-      this.graph.node(concept.id, concept);
-      this.render();
-    }
-    return concept.id;
-  };
-
-  /*
-  Creates node text labels.
-  */
-  this.defaultNewNodes = function(nodes) {
-    nodes
-      .classed('concept', function(d) { return 'concept' === d.type })
-      .classed('resource', function(d) { return 'resource' === d.type })
-      .attr('id', function(n) { return n.id; })
-      .append('text')
-        .attr('text-anchor', 'middle')
-        .attr('alignment-baseline', 'middle');
-  };
-
-  /*
-  Sets node labels.
-  */
-  this.defaultUpdateNodes = function(nodes) {
-    nodes.select('text')
-      .text(function(d) { return d.label; });
-  };
-
-  /*
-  Sets node group positions.
-  */
-  this.defaultUpdateNodePositions = function(nodes) {
-    nodes.attr('transform', function(n) {
-        var x = n.layout.x;
-        var y = n.layout.y;
-        return 'translate('+ x + ',' + y + ')';
-      });
-  };
-
-  /*
-  Creates edge paths.
-  */
-  this.defaultNewEdges = function(edges) {
-    edges.append('path')
-      .attr('marker-end', 'url(#arrowhead)');
-  };
-
-  /*
-  Positions edge paths.
-  */
-  this.defaultUpdateEdgePositions = function(edges) {
-    edges.select('path')
-      .attr('d', function(e) {
-        var path = e.layout.points.slice();
-        var p0 = path.length === 0 ? e.source.layout : path[0];
-        var p1 = path.length === 0 ? e.target.layout : path[path.length - 1];
-        path.unshift(intersectRect(e.source.layout, p0));
-        path.push(intersectRect(e.target.layout, p1));
-
-        return d3.svg.line()
-          .x(function(d) { return d.x; })
-          .y(function(d) { return d.y; })
-          .interpolate('basis')
-          (path);
-      });
-  };
-
-  // Create the SVG elements on the page necessary for this graph.
-  setupSVG.call(this, config);
-
-  // Create the three Renderers that link data to the DOM via the default
-  // methods defined above. Extending the renderer is a matter of adding more
-  // callbacks onNew and onUpdate. You can also remove the default behavior by
-  // calling offNew or offUpdate with the default functions.
-
-  this.renderNodes = new Renderer()
-    .into(this.nodeContainer)
-    .key(function(n) { return n.id; })
-    .make(function(e) { return e.append('g'); })
-    .useClass('node')
-    .onNew(this.defaultNewNodes)
-    .onUpdate(this.defaultUpdateNodes);
-
-  this.positionNodes = new Renderer()
-    .into(this.nodeContainer)
-    .key(function(n) { return n.id; })
-    .useClass('node')
-    .onUpdate(this.defaultUpdateNodePositions);
-
-  this.renderEdges = new Renderer()
-    .into(this.edgeContainer)
-    .key(function(d) { return d.id; })
-    .make(function(e) { return e.append('g'); })
-    .useClass('edgePath')
-    .onNew(this.defaultNewEdges);
-
-  this.positionEdges = new Renderer()
-    .into(this.edgeContainer)
-    .key(function(d) { return d.id; })
-    .make(function(e) { return e.append('g'); })
-    .useClass('edgePath')
-    .onUpdate(this.defaultUpdateEdgePositions);
-
-  /*
-  Lays out the graph and renders it into the DOM.
-  */
-  callback.call(this, 'preLayout');
-  callback.call(this, 'postLayout');
-  this.render = function() {
-    if(this.held()) {
-      return;
-    }
-    var self = this;
-
-    // Instead of a list of IDs, our data should be a list of objects.
-    this.nodes = this.graph.nodes().map(function(id) {
-      return self.graph.node(id);
-    });
-    var result = this.renderNodes.run(this.nodes);
-
-    // Add width and height information from the SVG elements.
-    result.data.each(function(d) {
-      d.width = this.getBBox().width;
-      d.height = this.getBBox().height;
-    });
-
-    // Generate a graph layout and render it.
-    var config = dagre.layout();
-    this.doPreLayout(config);
-    var layout = config.run(this.graph);
-    this.doPostLayout(layout);
-    this.provideLayout(layout);
-  };
-
-  /*
-  Give the graph a layout and render it.
-  */
-  this.provideLayout = function(layout) {
-    var self = this;
-    var g = this.graph;
-
-    // Augment existing node data with layout information.
-    this.nodes.forEach(function(node) {
-      node.layout = layout.node(node.id);
-    });
-    this.positionNodes.run(this.nodes);
-
-    var edges = layout.edges().map(function(id) {
-      return {
-        id: id,
-        source: g.node(g.incidentNodes(id)[0]),
-        target: g.node(g.incidentNodes(id)[1]),
-        value: g.edge(id),
-        layout: layout.edge(id)
-      };
-    });
-    this.renderEdges.run(edges);
-    this.positionEdges.run(edges);
-
-    this.layout = layout;
-  };
-
-  // Create the directed graph
-  this.graph = new dagre.Digraph();
-  createGraph.call(this, config);
-
-  // Initialise plugins.
-  if(config.plugins) {
-    for(var i = 0; i < config.plugins.length; i++) {
-      var plugin = config.plugins[i];
-      if('string' === typeof(plugin)) {
-        // If we're just given a name, check the registry for an existing plugin.
-        plugin = api.plugins[plugin];
-        if(undefined === plugin) {
-          console.error('Plugin \'' + config.plugins[i] + '\' not found!');
-        }
-      }
-      if(typeof plugin === 'function') {
-        // If we're provided with a raw function, just run it.
-        plugin(this);
-      }
-      else if(plugin && plugin.run) {
-        // If we have an object with a run member, treat it as a new plugin to
-        // be defined. Add it to the registry if necessary, and run it.
-        if(plugin.name) {
-          api.plugins[plugin.name] = plugin;
-        }
-        plugin.run(this);
-      }
-    }
-
-    this.__defineGetter__('plugins', function() {
-      return config.plugins;
-    });
-    this.__defineSetter__('plugins', function() {});
-  }
-
-  // Callbacks for plugins to respond to.
-  this.doZoomSetup(this.zoom);
-
-  // Display the graph
-  this.render();
-
-  return this;
-};
-
-/*
-Public API for the knowledge-map library
-*/
-var api = {
-  d3: d3,
-  dagre: dagre,
-
-  /*
-  Create a knowledge map display that layouts out the entire graph.
-  */
-  create: function(config) {
-    return new KnowledgeMap(this, config);
-  },
-
-  plugins: {
-    'hamburger-nodes': require('./hamburger-nodes-plugin.js')
-  },
-
-  registerPlugin: function(plugin) {
-    if(plugin && plugin.name && plugin.run) {
-      this.plugins[plugin.name] = plugin;
-    }
-  }
-};
-
-global.knowledgeMap = api; 
-module.exports = api;
-
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./hamburger-nodes-plugin.js":50,"d3":3,"dagre":4}],2:[function(require,module,exports){
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 d3 = function() {
   var d3 = {
     version: "3.3.13"
@@ -9878,12 +9292,12 @@ d3 = function() {
   });
   return d3;
 }();
-},{}],3:[function(require,module,exports){
+},{}],2:[function(require,module,exports){
 require("./d3");
 module.exports = d3;
 (function () { delete this.d3; })(); // unset global
 
-},{"./d3":2}],4:[function(require,module,exports){
+},{"./d3":1}],3:[function(require,module,exports){
 /*
 Copyright (c) 2012-2013 Chris Pettitt
 
@@ -9909,62 +9323,8 @@ exports.Digraph = require("graphlib").Digraph;
 exports.Graph = require("graphlib").Graph;
 exports.layout = require("./lib/layout");
 exports.version = require("./lib/version");
-exports.debug = require("./lib/debug");
 
-},{"./lib/debug":5,"./lib/layout":6,"./lib/version":21,"graphlib":27}],5:[function(require,module,exports){
-'use strict';
-
-var util = require('./util');
-
-/**
- * Renders a graph in a stringified DOT format that indicates the ordering of
- * nodes by layer. Circles represent normal nodes. Diamons represent dummy
- * nodes. While we try to put nodes in clusters, it appears that graphviz
- * does not respect this because we're later using subgraphs for ordering nodes
- * in each layer.
- */
-exports.dotOrdering = function(g) {
-  var ordering = util.ordering(g.filterNodes(util.filterNonSubgraphs(g)));
-  var result = 'digraph {';
-
-  function dfs(u) {
-    var children = g.children(u);
-    if (children.length) {
-      result += 'subgraph cluster_' + u + ' {';
-      result += 'label="' + u + '";';
-      children.forEach(function(v) {
-        dfs(v);
-      });
-      result += '}';
-    } else {
-      result += u;
-      if (g.node(u).dummy) {
-        result += ' [shape=diamond]';
-      }
-      result += ';';
-    }
-  }
-
-  g.children(null).forEach(dfs);
-
-  ordering.forEach(function(layer) {
-    result += 'subgraph { rank=same; edge [style="invis"];';
-    result += layer.join('->');
-    result += '}';
-  });
-
-  g.eachEdge(function(e, u, v) {
-    result += u + '->' + v + ';';
-  });
-
-  result += '}';
-
-  return result;
-};
-
-},{"./util":20}],6:[function(require,module,exports){
-'use strict';
-
+},{"./lib/layout":4,"./lib/version":19,"graphlib":25}],4:[function(require,module,exports){
 var util = require('./util'),
     rank = require('./rank'),
     order = require('./order'),
@@ -10233,9 +9593,7 @@ module.exports = function() {
 };
 
 
-},{"./order":7,"./position":12,"./rank":13,"./util":20,"graphlib":27}],7:[function(require,module,exports){
-'use strict';
-
+},{"./order":5,"./position":10,"./rank":11,"./util":18,"graphlib":25}],5:[function(require,module,exports){
 var util = require('./util'),
     crossCount = require('./order/crossCount'),
     initLayerGraphs = require('./order/initLayerGraphs'),
@@ -10338,21 +9696,19 @@ function sweep(g, layerGraphs, iter) {
 
 function sweepDown(g, layerGraphs) {
   var cg;
-  for (var i = 1; i < layerGraphs.length; ++i) {
+  for (i = 1; i < layerGraphs.length; ++i) {
     cg = sortLayer(layerGraphs[i], cg, predecessorWeights(g, layerGraphs[i].nodes()));
   }
 }
 
 function sweepUp(g, layerGraphs) {
   var cg;
-  for (var i = layerGraphs.length - 2; i >= 0; --i) {
+  for (i = layerGraphs.length - 2; i >= 0; --i) {
     sortLayer(layerGraphs[i], cg, successorWeights(g, layerGraphs[i].nodes()));
   }
 }
 
-},{"./order/crossCount":8,"./order/initLayerGraphs":9,"./order/initOrder":10,"./order/sortLayer":11,"./util":20}],8:[function(require,module,exports){
-'use strict';
-
+},{"./order/crossCount":6,"./order/initLayerGraphs":7,"./order/initOrder":8,"./order/sortLayer":9,"./util":18}],6:[function(require,module,exports){
 var util = require('../util');
 
 module.exports = crossCount;
@@ -10409,9 +9765,7 @@ function twoLayerCrossCount(g, layer1, layer2) {
   return cc;
 }
 
-},{"../util":20}],9:[function(require,module,exports){
-'use strict';
-
+},{"../util":18}],7:[function(require,module,exports){
 var nodesFromList = require('graphlib').filter.nodesFromList,
     /* jshint -W079 */
     Set = require('cp-data').Set;
@@ -10462,9 +9816,7 @@ function initLayerGraphs(g) {
   return layerGraphs;
 }
 
-},{"cp-data":22,"graphlib":27}],10:[function(require,module,exports){
-'use strict';
-
+},{"cp-data":20,"graphlib":25}],8:[function(require,module,exports){
 var crossCount = require('./crossCount'),
     util = require('../util');
 
@@ -10502,26 +9854,52 @@ function initOrder(g, random) {
   g.graph().orderCC = Number.MAX_VALUE;
 }
 
-},{"../util":20,"./crossCount":8}],11:[function(require,module,exports){
-'use strict';
-
-var util = require('../util'),
+},{"../util":18,"./crossCount":6}],9:[function(require,module,exports){
+var util = require('../util');
+/*
     Digraph = require('graphlib').Digraph,
     topsort = require('graphlib').alg.topsort,
     nodesFromList = require('graphlib').filter.nodesFromList;
+*/
 
 module.exports = sortLayer;
 
+/*
 function sortLayer(g, cg, weights) {
-  weights = adjustWeights(g, weights);
   var result = sortLayerSubgraph(g, null, cg, weights);
-
   result.list.forEach(function(u, i) {
     g.node(u).order = i;
   });
   return result.constraintGraph;
 }
+*/
 
+function sortLayer(g, cg, weights) {
+  var ordering = [];
+  var bs = {};
+  g.eachNode(function(u, value) {
+    ordering[value.order] = u;
+    var ws = weights[u];
+    if (ws.length) {
+      bs[u] = util.sum(ws) / ws.length;
+    }
+  });
+
+  var toSort = g.nodes().filter(function(u) { return bs[u] !== undefined; });
+  toSort.sort(function(x, y) {
+    return bs[x] - bs[y] || g.node(x).order - g.node(y).order;
+  });
+
+  for (var i = 0, j = 0, jl = toSort.length; j < jl; ++i) {
+    if (bs[ordering[i]] !== undefined) {
+      g.node(toSort[j++]).order = i;
+    }
+  }
+}
+
+// TOOD: re-enable constrained sorting once we have a strategy for handling
+// undefined barycenters.
+/*
 function sortLayerSubgraph(g, sg, cg, weights) {
   cg = cg ? cg.filterNodes(nodesFromList(g.children(sg))) : new Digraph();
 
@@ -10535,9 +9913,7 @@ function sortLayerSubgraph(g, sg, cg, weights) {
       var ws = weights[u];
       nodeData[u] = {
         degree: ws.length,
-        barycenter: util.sum(ws) / ws.length,
-        order: g.node(u).order,
-        orderCount: 1,
+        barycenter: ws.length > 0 ? util.sum(ws) / ws.length : 0,
         list: [u]
       };
     }
@@ -10547,8 +9923,7 @@ function sortLayerSubgraph(g, sg, cg, weights) {
 
   var keys = Object.keys(nodeData);
   keys.sort(function(x, y) {
-    return nodeData[x].barycenter - nodeData[y].barycenter ||
-           nodeData[x].order - nodeData[y].order;
+    return nodeData[x].barycenter - nodeData[y].barycenter;
   });
 
   var result =  keys.map(function(u) { return nodeData[u]; })
@@ -10556,6 +9931,7 @@ function sortLayerSubgraph(g, sg, cg, weights) {
   return result;
 }
 
+/*
 function mergeNodeData(g, lhs, rhs) {
   var cg = mergeDigraphs(lhs.constraintGraph, rhs.constraintGraph);
 
@@ -10572,9 +9948,6 @@ function mergeNodeData(g, lhs, rhs) {
     degree: lhs.degree + rhs.degree,
     barycenter: (lhs.barycenter * lhs.degree + rhs.barycenter * rhs.degree) /
                 (lhs.degree + rhs.degree),
-    order: (lhs.order * lhs.orderCount + rhs.order * rhs.orderCount) /
-           (lhs.orderCount + rhs.orderCount),
-    orderCount: lhs.orderCount + rhs.orderCount,
     list: lhs.list.concat(rhs.list),
     firstSG: lhs.firstSG !== undefined ? lhs.firstSG : rhs.firstSG,
     lastSG: rhs.lastSG !== undefined ? rhs.lastSG : lhs.lastSG,
@@ -10644,48 +10017,9 @@ function findViolatedConstraint(cg, nodeData) {
     }
   }
 }
+*/
 
-// Adjust weights so that they fall in the range of 0..|N|-1. If a node has no
-// weight assigned then set its adjusted weight to its current position. This
-// allows us to better retain the origiinal position of nodes without neighbors.
-function adjustWeights(g, weights) {
-  var minW = Number.MAX_VALUE,
-      maxW = 0,
-      adjusted = {};
-  g.eachNode(function(u) {
-    if (g.children(u).length) return;
-
-    var ws = weights[u];
-    if (ws.length) {
-      minW = Math.min(minW, util.min(ws));
-      maxW = Math.max(maxW, util.max(ws));
-    }
-  });
-
-  var rangeW = (maxW - minW);
-  g.eachNode(function(u) {
-    if (g.children(u).length) return;
-
-    var ws = weights[u];
-    if (!ws.length) {
-      adjusted[u] = [g.node(u).order];
-    } else {
-      adjusted[u] = ws.map(function(w) {
-        if (rangeW) {
-          return (w - minW) * (g.order() - 1) / rangeW;
-        } else {
-          return g.order() - 1 / 2;
-        }
-      });
-    }
-  });
-
-  return adjusted;
-}
-
-},{"../util":20,"graphlib":27}],12:[function(require,module,exports){
-'use strict';
-
+},{"../util":18}],10:[function(require,module,exports){
 var util = require('./util');
 
 /*
@@ -11125,9 +10459,7 @@ module.exports = function() {
   }
 };
 
-},{"./util":20}],13:[function(require,module,exports){
-'use strict';
-
+},{"./util":18}],11:[function(require,module,exports){
 var util = require('./util'),
     acyclic = require('./rank/acyclic'),
     initRank = require('./rank/initRank'),
@@ -11265,9 +10597,7 @@ function normalize(g) {
   g.eachNode(function(u, node) { node.rank -= m; });
 }
 
-},{"./rank/acyclic":14,"./rank/constraints":15,"./rank/feasibleTree":16,"./rank/initRank":17,"./rank/simplex":19,"./util":20,"graphlib":27}],14:[function(require,module,exports){
-'use strict';
-
+},{"./rank/acyclic":12,"./rank/constraints":13,"./rank/feasibleTree":14,"./rank/initRank":15,"./rank/simplex":17,"./util":18,"graphlib":25}],12:[function(require,module,exports){
 var util = require('../util');
 
 module.exports = acyclic;
@@ -11330,9 +10660,7 @@ function undo(g) {
   });
 }
 
-},{"../util":20}],15:[function(require,module,exports){
-'use strict';
-
+},{"../util":18}],13:[function(require,module,exports){
 exports.apply = function(g) {
   function dfs(sg) {
     var rankSets = {};
@@ -11501,9 +10829,7 @@ exports.relax = function(g) {
   });
 };
 
-},{}],16:[function(require,module,exports){
-'use strict';
-
+},{}],14:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require('cp-data').Set,
 /* jshint +W079 */
@@ -11628,9 +10954,7 @@ function slack(g, u, v) {
   return rankDiff - maxMinLen;
 }
 
-},{"../util":20,"cp-data":22,"graphlib":27}],17:[function(require,module,exports){
-'use strict';
-
+},{"../util":18,"cp-data":20,"graphlib":25}],15:[function(require,module,exports){
 var util = require('../util'),
     topsort = require('graphlib').alg.topsort;
 
@@ -11662,9 +10986,7 @@ function initRank(g) {
   });
 }
 
-},{"../util":20,"graphlib":27}],18:[function(require,module,exports){
-'use strict';
-
+},{"../util":18,"graphlib":25}],16:[function(require,module,exports){
 module.exports = {
   slack: slack
 };
@@ -11682,9 +11004,7 @@ function slack(graph, u, v, minLen) {
   return Math.abs(graph.node(u).rank - graph.node(v).rank) - minLen;
 }
 
-},{}],19:[function(require,module,exports){
-'use strict';
-
+},{}],17:[function(require,module,exports){
 var util = require('../util'),
     rankUtil = require('./rankUtil');
 
@@ -11994,9 +11314,7 @@ function minimumLength(graph, u, v) {
   }
 }
 
-},{"../util":20,"./rankUtil":18}],20:[function(require,module,exports){
-'use strict';
-
+},{"../util":18,"./rankUtil":16}],18:[function(require,module,exports){
 /*
  * Returns the smallest value in the array.
  */
@@ -12040,7 +11358,7 @@ exports.values = function(obj) {
 };
 
 exports.shuffle = function(array) {
-  for (var i = array.length - 1; i > 0; --i) {
+  for (i = array.length - 1; i > 0; --i) {
     var j = Math.floor(Math.random() * (i + 1));
     var aj = array[j];
     array[j] = array[i];
@@ -12115,15 +11433,15 @@ log.level = 0;
 
 exports.log = log;
 
-},{}],21:[function(require,module,exports){
-module.exports = '0.4.6';
+},{}],19:[function(require,module,exports){
+module.exports = '0.4.5';
 
-},{}],22:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 exports.Set = require('./lib/Set');
 exports.PriorityQueue = require('./lib/PriorityQueue');
 exports.version = require('./lib/version');
 
-},{"./lib/PriorityQueue":23,"./lib/Set":24,"./lib/version":26}],23:[function(require,module,exports){
+},{"./lib/PriorityQueue":21,"./lib/Set":22,"./lib/version":24}],21:[function(require,module,exports){
 module.exports = PriorityQueue;
 
 /**
@@ -12274,7 +11592,7 @@ PriorityQueue.prototype._swap = function(i, j) {
   keyIndices[origArrI.key] = j;
 };
 
-},{}],24:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 var util = require('./util');
 
 module.exports = Set;
@@ -12412,7 +11730,7 @@ function values(o) {
   return result;
 }
 
-},{"./util":25}],25:[function(require,module,exports){
+},{"./util":23}],23:[function(require,module,exports){
 /*
  * This polyfill comes from
  * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/isArray
@@ -12471,10 +11789,10 @@ if ('function' !== typeof Array.prototype.reduce) {
   };
 }
 
-},{}],26:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 module.exports = '1.1.3';
 
-},{}],27:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 exports.Graph = require("./lib/Graph");
 exports.Digraph = require("./lib/Digraph");
 exports.CGraph = require("./lib/CGraph");
@@ -12507,7 +11825,7 @@ exports.filter = {
 
 exports.version = require("./lib/version");
 
-},{"./lib/CDigraph":29,"./lib/CGraph":30,"./lib/Digraph":31,"./lib/Graph":32,"./lib/alg/components":33,"./lib/alg/dijkstra":34,"./lib/alg/dijkstraAll":35,"./lib/alg/findCycles":36,"./lib/alg/floydWarshall":37,"./lib/alg/isAcyclic":38,"./lib/alg/postorder":39,"./lib/alg/preorder":40,"./lib/alg/prim":41,"./lib/alg/tarjan":42,"./lib/alg/topsort":43,"./lib/converter/json.js":45,"./lib/filter":46,"./lib/graph-converters":47,"./lib/version":49}],28:[function(require,module,exports){
+},{"./lib/CDigraph":27,"./lib/CGraph":28,"./lib/Digraph":29,"./lib/Graph":30,"./lib/alg/components":31,"./lib/alg/dijkstra":32,"./lib/alg/dijkstraAll":33,"./lib/alg/findCycles":34,"./lib/alg/floydWarshall":35,"./lib/alg/isAcyclic":36,"./lib/alg/postorder":37,"./lib/alg/preorder":38,"./lib/alg/prim":39,"./lib/alg/tarjan":40,"./lib/alg/topsort":41,"./lib/converter/json.js":43,"./lib/filter":44,"./lib/graph-converters":45,"./lib/version":47}],26:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -12704,7 +12022,7 @@ function delEdgeFromMap(map, v, e) {
 }
 
 
-},{"cp-data":22}],29:[function(require,module,exports){
+},{"cp-data":20}],27:[function(require,module,exports){
 var Digraph = require("./Digraph"),
     compoundify = require("./compoundify");
 
@@ -12741,7 +12059,7 @@ CDigraph.prototype.toString = function() {
   return "CDigraph " + JSON.stringify(this, null, 2);
 };
 
-},{"./Digraph":31,"./compoundify":44}],30:[function(require,module,exports){
+},{"./Digraph":29,"./compoundify":42}],28:[function(require,module,exports){
 var Graph = require("./Graph"),
     compoundify = require("./compoundify");
 
@@ -12778,7 +12096,7 @@ CGraph.prototype.toString = function() {
   return "CGraph " + JSON.stringify(this, null, 2);
 };
 
-},{"./Graph":32,"./compoundify":44}],31:[function(require,module,exports){
+},{"./Graph":30,"./compoundify":42}],29:[function(require,module,exports){
 /*
  * This file is organized with in the following order:
  *
@@ -13046,7 +12364,7 @@ Digraph.prototype._filterNodes = function(pred) {
 };
 
 
-},{"./BaseGraph":28,"./util":48,"cp-data":22}],32:[function(require,module,exports){
+},{"./BaseGraph":26,"./util":46,"cp-data":20}],30:[function(require,module,exports){
 /*
  * This file is organized with in the following order:
  *
@@ -13181,7 +12499,7 @@ Graph.prototype.delEdge = function(e) {
 };
 
 
-},{"./BaseGraph":28,"./util":48,"cp-data":22}],33:[function(require,module,exports){
+},{"./BaseGraph":26,"./util":46,"cp-data":20}],31:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -13224,7 +12542,7 @@ function components(g) {
   return results;
 }
 
-},{"cp-data":22}],34:[function(require,module,exports){
+},{"cp-data":20}],32:[function(require,module,exports){
 var PriorityQueue = require("cp-data").PriorityQueue;
 
 module.exports = dijkstra;
@@ -13304,7 +12622,7 @@ function dijkstra(g, source, weightFunc, incidentFunc) {
   return results;
 }
 
-},{"cp-data":22}],35:[function(require,module,exports){
+},{"cp-data":20}],33:[function(require,module,exports){
 var dijkstra = require("./dijkstra");
 
 module.exports = dijkstraAll;
@@ -13341,7 +12659,7 @@ function dijkstraAll(g, weightFunc, incidentFunc) {
   return results;
 }
 
-},{"./dijkstra":34}],36:[function(require,module,exports){
+},{"./dijkstra":32}],34:[function(require,module,exports){
 var tarjan = require("./tarjan");
 
 module.exports = findCycles;
@@ -13363,7 +12681,7 @@ function findCycles(g) {
   return tarjan(g).filter(function(cmpt) { return cmpt.length > 1; });
 }
 
-},{"./tarjan":42}],37:[function(require,module,exports){
+},{"./tarjan":40}],35:[function(require,module,exports){
 module.exports = floydWarshall;
 
 /**
@@ -13442,7 +12760,7 @@ function floydWarshall(g, weightFunc, incidentFunc) {
   return results;
 }
 
-},{}],38:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 var topsort = require("./topsort");
 
 module.exports = isAcyclic;
@@ -13468,7 +12786,7 @@ function isAcyclic(g) {
   return true;
 }
 
-},{"./topsort":43}],39:[function(require,module,exports){
+},{"./topsort":41}],37:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -13495,7 +12813,7 @@ function postorder(g, root, f) {
   dfs(root);
 }
 
-},{"cp-data":22}],40:[function(require,module,exports){
+},{"cp-data":20}],38:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -13522,7 +12840,7 @@ function preorder(g, root, f) {
   dfs(root);
 }
 
-},{"cp-data":22}],41:[function(require,module,exports){
+},{"cp-data":20}],39:[function(require,module,exports){
 var Graph = require("../Graph"),
     PriorityQueue = require("cp-data").PriorityQueue;
 
@@ -13593,7 +12911,7 @@ function prim(g, weightFunc) {
   return result;
 }
 
-},{"../Graph":32,"cp-data":22}],42:[function(require,module,exports){
+},{"../Graph":30,"cp-data":20}],40:[function(require,module,exports){
 module.exports = tarjan;
 
 /**
@@ -13661,7 +12979,7 @@ function tarjan(g) {
   return results;
 }
 
-},{}],43:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 module.exports = topsort;
 topsort.CycleException = CycleException;
 
@@ -13719,7 +13037,7 @@ CycleException.prototype.toString = function() {
   return "Graph has at least one cycle";
 };
 
-},{}],44:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 // This file provides a helper function that mixes-in Dot behavior to an
 // existing graph prototype.
 
@@ -13827,7 +13145,7 @@ function compoundify(SuperConstructor) {
   return Constructor;
 }
 
-},{"cp-data":22}],45:[function(require,module,exports){
+},{"cp-data":20}],43:[function(require,module,exports){
 var Graph = require("../Graph"),
     Digraph = require("../Digraph"),
     CGraph = require("../CGraph"),
@@ -13917,7 +13235,7 @@ function typeOf(obj) {
   return Object.prototype.toString.call(obj).slice(8, -1);
 }
 
-},{"../CDigraph":29,"../CGraph":30,"../Digraph":31,"../Graph":32}],46:[function(require,module,exports){
+},{"../CDigraph":27,"../CGraph":28,"../Digraph":29,"../Graph":30}],44:[function(require,module,exports){
 /* jshint -W079 */
 var Set = require("cp-data").Set;
 /* jshint +W079 */
@@ -13933,7 +13251,7 @@ exports.nodesFromList = function(nodes) {
   };
 };
 
-},{"cp-data":22}],47:[function(require,module,exports){
+},{"cp-data":20}],45:[function(require,module,exports){
 var Graph = require("./Graph"),
     Digraph = require("./Digraph");
 
@@ -13972,7 +13290,7 @@ Digraph.prototype.asUndirected = function() {
   return g;
 };
 
-},{"./Digraph":31,"./Graph":32}],48:[function(require,module,exports){
+},{"./Digraph":29,"./Graph":30}],46:[function(require,module,exports){
 // Returns an array of all values for properties of **o**.
 exports.values = function(o) {
   var ks = Object.keys(o),
@@ -13985,10 +13303,10 @@ exports.values = function(o) {
   return result;
 };
 
-},{}],49:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 module.exports = '0.7.4';
 
-},{}],50:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 var d3 = require('d3');
 
 var setupHamburgerNodes = function(km) {
@@ -14118,4 +13436,596 @@ module.exports = {
   run: setupHamburgerNodes
 };
 
-},{"d3":3}]},{},[1]);
+},{"d3":2}],49:[function(require,module,exports){
+(function (global){
+"use strict";
+
+var d3 = require('d3');
+var dagre = require('dagre');
+
+/**
+ Call this on an object to define a 'callback' handler with lots of boilerplate
+ functionality taken care of. There will be three new methods on this object,
+ where Name is the name you give the callback:
+
+   doName - calls all the callback handlers assigned to this callback, passing
+            them the arguments passed to it.
+   onName - registers a handler for this callback.
+   offName - removes a callback handler for this callback.
+
+ For example:
+
+  var myObject = {callbacks: []};
+  callback.call(myObject, 'update');
+  var updateHandler = function(arg) {
+    console.log('Object updated and says: ' + arg);
+  };
+  myObject.onUpdate(updateHandler);
+  myObject.doUpdate('hello!');
+  myObject.offUpdate(updateHandler);
+  myObject.doUpdate('you won't see this!');
+
+ */
+function callback(name) {
+  if(!this.callbacks) {
+    this.callbacks = {};
+  }
+  this.callbacks[name] = [];
+  var capName = name[0].toUpperCase() + name.slice(1);
+
+  this['do' + capName] = function() {
+    var args = Array.prototype.slice.call(arguments);
+    var self = this;
+    this.callbacks[name].forEach(function(cb) { cb.apply(self, args); });
+  };
+
+  this['on' + capName] = function(cb) {
+    this.callbacks[name].push(cb);
+    return this;
+  };
+
+  this['off' + capName] = function(cb) {
+    var idx = this.callbacks[name].indexOf(cb);
+    if(-1 !== idx) {
+      this.callbacks[name].splice(idx, 1);
+    }
+    return this;
+  };
+}
+
+function property(store, access) {
+  this[store] = undefined;
+  this[access] = function(val) {
+    if(undefined === val) {
+      return this[store];
+    } else {
+      this[store] = val;
+      return this;
+    }
+  };
+}
+
+function Renderer() {
+  callback.call(this, 'new');
+  callback.call(this, 'update');
+
+  property.call(this, '_into', 'into');
+  property.call(this, 'cls', 'useClass');
+  property.call(this, 'rowKey', 'key');
+  property.call(this, 'makeRows', 'make');
+
+  this.run = function (data) {
+    function error(message) {
+      throw message;
+    }
+
+    var row = this.cls || 'km-row';
+
+    var rows = this.into().selectAll('.' + row);
+    var rowData = rows.data(data, this.rowKey);
+    rowData.exit().remove();
+
+    var newRows;
+    if(this.makeRows) {
+      newRows = this.makeRows(rowData.enter());
+    } else if(this.cls) {
+      newRows = rowData.enter().select(this.cls);
+    } else {
+      error('makeColumn did not return a selection');
+    }
+    newRows.classed(row, true);
+
+    this.doNew(newRows);
+    this.doUpdate(rowData);
+
+    return {data: rowData, enter: newRows};
+  };
+}
+
+/*
+Rectangle intersection from dagre-d3 source.
+*/
+function intersectRect(rect, point) {
+  var x = rect.x;
+  var y = rect.y;
+
+  // For now we only support rectangles
+
+  // Rectangle intersection algorithm from:
+  // http://math.stackexchange.com/questions/108113/find-edge-between-two-boxes
+  var dx = point.x - x;
+  var dy = point.y - y;
+  var w = rect.width / 2;
+  var h = rect.height / 2;
+
+  var sx, sy;
+  if (Math.abs(dy) * w > Math.abs(dx) * h) {
+    // Intersection is top or bottom of rect.
+    if (dy < 0) {
+      h = -h;
+    }
+    sx = dy === 0 ? 0 : h * dx / dy;
+    sy = h;
+  } else {
+    // Intersection is left or right of rect.
+    if (dx < 0) {
+      w = -w;
+    }
+    sx = w;
+    sy = dx === 0 ? 0 : w * dy / dx;
+  }
+
+  return {x: x + sx, y: y + sy};
+}
+
+/*
+ * Create a graph from a config. At the moment, only a list of resources is used
+ * to build the graph.
+ */
+function createGraph(config) {
+  this.hold();
+  if (config && config.resources) {
+    var self = this;
+    config.resources.forEach(function(r) {
+      self.addResource(r);
+    });
+  }
+  this.unhold();
+  return this;
+}
+
+function setupSVG(config) {
+  // Create elements on the page for us to render our graph in
+  var parentName = config.inside || 'body';
+  var svg = d3.select(parentName).append('svg');
+  var root = svg.append('g');
+
+  // Define the #arrowhead shape for use with edge paths.
+  svg.append('svg:defs')
+    .append('svg:marker')
+      .attr('id', 'arrowhead')
+      .attr('viewBox', '0 0 10 10')
+      .attr('refX', 8)
+      .attr('refY', 5)
+      .attr('markerUnits', 'strokeWidth')
+      .attr('markerWidth', 8)
+      .attr('markerHeight', 5)
+      .attr('orient', 'auto')
+      .attr('style', 'fill: #333')
+      .append('svg:path')
+        .attr('d', 'M 0 0 L 10 5 L 0 10 z');
+
+  // Add a 'backstop' so we can catch pointer events on the entire SVG.
+  root.append('rect')
+      .attr('class', 'overlay')
+      .attr('width', '100%')
+      .attr('height', '100%')
+      .style('fill', 'none')
+      .style('pointer-events', 'all');
+
+  // Make zoomable.
+  var el = this.element = root.append('g');
+  var self = this;
+
+  callback.call(this, 'zoom');
+  callback.call(this, 'zoomSetup');
+  this.zoom = d3.behavior.zoom();
+  root.call(this.zoom.on("zoom", function () {
+    self.doZoom(this.zoom);
+  }));
+
+  this.defaultZoomSetup = function(zoom) {
+    zoom.scaleExtent([0.3, 1]);
+  };
+  this.onZoomSetup(this.defaultZoomSetup);
+  this.defaultOnZoom = function() {
+    el.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+  };
+  this.onZoom(this.defaultOnZoom);
+
+  // Groups for node and edge SVG elements.
+  this.edgeContainer = this.element.append('g').classed('edges', true);
+  this.nodeContainer = this.element.append('g').classed('nodes', true);
+}
+
+/*
+Construct a knowledge map object.
+
+Accepts a single object:
+  config: an object that contains the data about the graph and various other
+  options
+  The available options are:
+    graph: a JSON object that contains the graph data
+    plugins: a list of plugin names or plugin objects
+*/
+var KnowledgeMap = function(api, config) {
+  config = config || {};
+
+  /*
+  Hold API
+  */
+  var held    = !!config.held;
+  this.hold   = function() { held = true; return this; }
+  this.unhold = function() { held = false; return this; }
+  this.held   = function() { return held; }
+
+  /*
+   * Resource API
+   */
+  this.addResource = function(resource) {
+    // Just for uniformity of API, allow a single string to create a named
+    // resource. This will never be useful.
+    if('string' === typeof(resource)) {
+      resource = {
+        id: resource.toLowerCase().replace(/ /g, '-'),
+        label: resource,
+        type: 'resource',
+        content: {},
+        teaches: [],
+        requires: [],
+        needs: []
+      };
+    } else {
+      resource = {
+        id: resource.id || resource.label.toLowerCase().replace(/ /g, '-'),
+        label: resource.label,
+        type: 'resource',
+        content: resource.content || {},
+        teaches: resource.teaches || [],
+        requires: resource.requires || [],
+        needs: resource.needs || []
+      };
+    }
+
+    // Add the resource to the graph as a node.
+    this.graph.addNode(resource.id, resource);
+
+    // Deal with all the dependencies. Add new concepts and assets where
+    // necessary, and add edges in the appropriate direction.
+    var self = this;
+    var id = resource.id;
+
+    // X-teaches-Y is an arrow from resource X to concept Y.
+    if(resource.teaches) {
+      resource.teaches.forEach(function(c) {
+        var cid = self.defineConcept(c);
+        self.graph.addEdge(id+'-teaches-'+cid, id, cid);
+      });
+    }
+
+    // Y-requires-X is an arrow from concept Y to resource X.
+    if(resource.requires) {
+      resource.requires.forEach(function(c) {
+        var cid = self.defineConcept(c);
+        self.graph.addEdge(id+'-requires-'+cid, cid, id);
+      });
+    }
+
+    if(resource.needs) {
+      resource.needs.forEach(function(a) {
+        //var aid = self.defineAsset(a);
+      });
+    }
+
+    this.render();
+    return id;
+  };
+
+  this.removeResource = function(resourceId) {
+    if('string' !== typeof(resourceId)) {
+      resourceId = resourceId.id;
+    }
+
+    if(this.graph.hasNode(resourceId)) {
+      // Remove resource node and all edges.
+      var resource = this.graph.node(resourceId);
+      this.graph.delNode(resourceId);
+
+      // Remove concept nodes with no more incident edges.
+      var self = this;
+      var removeConcept = function(id) {
+        id = self.defineConcept(id);
+        if(self.graph.hasNode(id)) {
+          if(!self.graph.incidentEdges(id).length) {
+            self.graph.delNode(id);
+          }
+        }
+      };
+
+      if(resource.teaches) { resource.teaches.forEach(removeConcept); }
+      if(resource.requires) { resource.requires.forEach(removeConcept); }
+    }
+
+    this.render();
+  };
+
+  /**
+   Define a concept object that will be included in the graph. If a string is
+   passed, a new concept object will be created. The string is treated as the
+   label of the concept, and converted into a correct ID. If an object is passed,
+   the object will replace the contents of any existing concept with the same ID.
+  */
+  this.defineConcept = function(concept) {
+    var replace = true;
+    if('string' === typeof(concept)) {
+      replace = false;
+      concept = {
+        id: concept.toLowerCase().replace(/ /g, '-'),
+        label: concept,
+        type: 'concept',
+        content: {}
+      };
+    } else {
+      concept = {
+        id: concept.id || concept.label.toLowerCase().replace(/ /g, '-'),
+        label: concept.label,
+        type: 'concept',
+        content: concept.content || {}
+      };
+    }
+
+    if(!this.graph.hasNode(concept.id)) {
+      this.graph.addNode(concept.id, concept);
+      this.render();
+    } else if(replace) {
+      this.graph.node(concept.id, concept);
+      this.render();
+    }
+    return concept.id;
+  };
+
+  /*
+  Creates node text labels.
+  */
+  this.defaultNewNodes = function(nodes) {
+    nodes
+      .classed('concept', function(d) { return 'concept' === d.type })
+      .classed('resource', function(d) { return 'resource' === d.type })
+      .attr('id', function(n) { return n.id; })
+      .append('text')
+        .attr('text-anchor', 'middle')
+        .attr('alignment-baseline', 'middle');
+  };
+
+  /*
+  Calculate the dimensions of each node after the elements have been rendered
+  into the page.
+  */
+  this.calculateNodeSizes = function(nodes) {
+    nodes.each(function(d) {
+      d.width = this.getBBox().width;
+      d.height = this.getBBox().height;
+    });
+  };
+
+  /*
+  Sets node labels.
+  */
+  this.defaultUpdateNodes = function(nodes) {
+    nodes.select('text')
+      .text(function(d) { return d.label; });
+  };
+
+  /*
+  Sets node group positions.
+  */
+  this.defaultUpdateNodePositions = function(nodes) {
+    nodes.attr('transform', function(n) {
+        var x = n.layout.x;
+        var y = n.layout.y;
+        return 'translate('+ x + ',' + y + ')';
+      });
+  };
+
+  /*
+  Creates edge paths.
+  */
+  this.defaultNewEdges = function(edges) {
+    edges.append('path')
+      .attr('marker-end', 'url(#arrowhead)');
+  };
+
+  /*
+  Positions edge paths.
+  */
+  this.defaultUpdateEdgePositions = function(edges) {
+    edges.select('path')
+      .attr('d', function(e) {
+        var path = e.layout.points.slice();
+        var p0 = path.length === 0 ? e.source.layout : path[0];
+        var p1 = path.length === 0 ? e.target.layout : path[path.length - 1];
+        path.unshift(intersectRect(e.source.layout, p0));
+        path.push(intersectRect(e.target.layout, p1));
+
+        return d3.svg.line()
+          .x(function(d) { return d.x; })
+          .y(function(d) { return d.y; })
+          .interpolate('basis')
+          (path);
+      });
+  };
+
+  // Create the SVG elements on the page necessary for this graph.
+  setupSVG.call(this, config);
+
+  // Create the three Renderers that link data to the DOM via the default
+  // methods defined above. Extending the renderer is a matter of adding more
+  // callbacks onNew and onUpdate. You can also remove the default behavior by
+  // calling offNew or offUpdate with the default functions.
+
+  this.renderNodes = new Renderer()
+    .into(this.nodeContainer)
+    .key(function(n) { return n.id; })
+    .make(function(e) { return e.append('g'); })
+    .useClass('node')
+    .onNew(this.defaultNewNodes)
+    .onUpdate(this.calculateNodeSizes)
+    .onUpdate(this.defaultUpdateNodes);
+
+  this.positionNodes = new Renderer()
+    .into(this.nodeContainer)
+    .key(function(n) { return n.id; })
+    .useClass('node')
+    .onUpdate(this.defaultUpdateNodePositions);
+
+  this.renderEdges = new Renderer()
+    .into(this.edgeContainer)
+    .key(function(d) { return d.id; })
+    .make(function(e) { return e.append('g'); })
+    .useClass('edgePath')
+    .onNew(this.defaultNewEdges);
+
+  this.positionEdges = new Renderer()
+    .into(this.edgeContainer)
+    .key(function(d) { return d.id; })
+    .make(function(e) { return e.append('g'); })
+    .useClass('edgePath')
+    .onUpdate(this.defaultUpdateEdgePositions);
+
+  /*
+  Lays out the graph and renders it into the DOM.
+  */
+  callback.call(this, 'preLayout');
+  callback.call(this, 'postLayout');
+  this.render = function() {
+    if(this.held()) {
+      return;
+    }
+    var self = this;
+
+    // Instead of a list of IDs, our data should be a list of objects.
+    this.nodes = this.graph.nodes().map(function(id) {
+      return self.graph.node(id);
+    });
+    var result = this.renderNodes.run(this.nodes);
+
+    // Generate a graph layout and render it.
+    var config = dagre.layout();
+    this.doPreLayout(config);
+    var layout = config.run(this.graph);
+    this.doPostLayout(layout);
+    this.provideLayout(layout);
+  };
+
+  /*
+  Give the graph a layout and render it.
+  */
+  this.provideLayout = function(layout) {
+    var self = this;
+    var g = this.graph;
+
+    // Augment existing node data with layout information.
+    this.nodes.forEach(function(node) {
+      node.layout = layout.node(node.id);
+    });
+    this.positionNodes.run(this.nodes);
+
+    var edges = layout.edges().map(function(id) {
+      return {
+        id: id,
+        source: g.node(g.incidentNodes(id)[0]),
+        target: g.node(g.incidentNodes(id)[1]),
+        value: g.edge(id),
+        layout: layout.edge(id)
+      };
+    });
+    this.renderEdges.run(edges);
+    this.positionEdges.run(edges);
+
+    this.layout = layout;
+  };
+
+  // Create the directed graph
+  this.graph = new dagre.Digraph();
+  createGraph.call(this, config);
+
+  // Initialise plugins.
+  if(config.plugins) {
+    for(var i = 0; i < config.plugins.length; i++) {
+      var plugin = config.plugins[i];
+      if('string' === typeof(plugin)) {
+        // If we're just given a name, check the registry for an existing plugin.
+        plugin = api.plugins[plugin];
+        if(undefined === plugin) {
+          console.error('Plugin \'' + config.plugins[i] + '\' not found!');
+        }
+      }
+      if(typeof plugin === 'function') {
+        // If we're provided with a raw function, just run it.
+        plugin(this);
+      }
+      else if(plugin && plugin.run) {
+        // If we have an object with a run member, treat it as a new plugin to
+        // be defined. Add it to the registry if necessary, and run it.
+        if(plugin.name) {
+          api.plugins[plugin.name] = plugin;
+        }
+        plugin.run(this);
+      }
+    }
+
+    this.__defineGetter__('plugins', function() {
+      return config.plugins;
+    });
+    this.__defineSetter__('plugins', function() {});
+  }
+
+  // Callbacks for plugins to respond to.
+  this.doZoomSetup(this.zoom);
+
+  // Display the graph
+  this.render();
+
+  return this;
+};
+
+/*
+Public API for the knowledge-map library
+*/
+var api = {
+  d3: d3,
+  dagre: dagre,
+
+  /*
+  Create a knowledge map display that layouts out the entire graph.
+  */
+  create: function(config) {
+    return new KnowledgeMap(this, config);
+  },
+
+  plugins: {
+    'hamburger-nodes': require('./hamburger-nodes-plugin.js')
+  },
+
+  registerPlugin: function(plugin) {
+    if(plugin && plugin.name && plugin.run) {
+      this.plugins[plugin.name] = plugin;
+    }
+  }
+};
+
+global.knowledgeMap = api; 
+module.exports = api;
+
+}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./hamburger-nodes-plugin.js":48,"d3":2,"dagre":3}]},{},[49])
