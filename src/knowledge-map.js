@@ -401,8 +401,10 @@ var KnowledgeMap = function(api, config) {
   Creates edge paths.
   */
   this.defaultNewEdges = function(edges) {
-    edges.append('path')
-      .attr('marker-end', 'url(#arrowhead)');
+    edges
+      .attr('id', function(e) { return e.id; })
+      .append('path')
+        .attr('marker-end', 'url(#arrowhead)');
   };
 
   /*
