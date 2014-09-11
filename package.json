@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "d3": "~3.3.8",
+	"graphlib": "0.7.4",
     "dagre-d3": "git://github.com/knowledge-map/dagre-d3.git#knowledge-map",
     "PicoModal": "git://github.com/d3x7r0/PicoModal.git#master"
   },

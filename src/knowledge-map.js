@@ -2,6 +2,7 @@
 
 var d3 = require('d3');
 var dagre = require('dagre');
+var graphlib = require('graphlib');
 
 /**
  Call this on an object to define a 'callback' handler with lots of boilerplate
@@ -475,33 +476,28 @@ var KnowledgeMap = function(api, config) {
     }
     var self = this;
 
-    // Instead of a list of IDs, our data should be a list of objects.
-    this.nodes = this.graph.nodes().map(function(id) {
-      return self.graph.node(id);
-    });
-    var result = this.renderNodes.run(this.nodes);
-
-    // Generate a graph layout and render it.
+    // Give plugins a chance to play with the config and preprocess the graph.
     var config = dagre.layout();
-    this.doPreLayout(config);
-    var layout = config.run(this.graph);
-    this.doPostLayout(layout);
-    this.provideLayout(layout);
-  };
+    var graph = this.graph.copy();
+    this.doPreLayout(config, graph);
 
-  /*
-  Give the graph a layout and render it.
-  */
-  this.provideLayout = function(layout) {
-    var self = this;
-    var g = this.graph;
+    // Instead of a list of IDs, our data should be a list of objects.
+    var nodes = graph.nodes().map(function(id) {
+      return graph.node(id);
+    });
+
+    // Perform graph layout.
+    var result = this.renderNodes.run(nodes);
+    var layout = config.run(graph);
+    this.doPostLayout(layout);
 
     // Augment existing node data with layout information.
-    this.nodes.forEach(function(node) {
+    nodes.forEach(function(node) {
       node.layout = layout.node(node.id);
     });
-    this.positionNodes.run(this.nodes);
+    this.positionNodes.run(nodes);
 
+    var g = graph;
     var edges = layout.edges().map(function(id) {
       return {
         id: id,
@@ -567,6 +563,7 @@ Public API for the knowledge-map library
 var api = {
   d3: d3,
   dagre: dagre,
+  graphlib: graphlib,
 
   /*
   Create a knowledge map display that layouts out the entire graph.
