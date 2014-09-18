@@ -442,8 +442,8 @@ var KnowledgeMap = function(api, config) {
     .make(function(e) { return e.append('g'); })
     .useClass('node')
     .onNew(this.defaultNewNodes)
-    .onUpdate(this.calculateNodeSizes)
-    .onUpdate(this.defaultUpdateNodes);
+    .onUpdate(this.defaultUpdateNodes)
+    .onUpdate(this.calculateNodeSizes);
 
   this.positionNodes = new Renderer()
     .into(this.nodeContainer)
