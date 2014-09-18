@@ -380,6 +380,18 @@ var KnowledgeMap = function(api, config) {
   };
 
   /*
+  Calculate the dimensions of a node based on just its text element, before any
+  decoration is added. This allows plugins to modify the element's width without
+  making permanent changes to this value.
+  */
+  this.calculateNodeBaseSizes = function(nodes) {
+    nodes.select('text').each(function(d) {
+      d.width  = d.baseWidth  = this.getBBox().width;
+      d.height = d.baseHeight = this.getBBox().height;
+    });
+  };
+
+  /*
   Sets node labels.
   */
   this.defaultUpdateNodes = function(nodes) {
@@ -443,7 +455,7 @@ var KnowledgeMap = function(api, config) {
     .useClass('node')
     .onNew(this.defaultNewNodes)
     .onUpdate(this.defaultUpdateNodes)
-    .onUpdate(this.calculateNodeSizes);
+    .onUpdate(this.calculateNodeBaseSizes);
 
   this.positionNodes = new Renderer()
     .into(this.nodeContainer)
