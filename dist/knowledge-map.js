@@ -160,7 +160,8 @@ function createGraph(config) {
 function setupSVG(config) {
   // Create elements on the page for us to render our graph in
   var parentName = config.inside || 'body';
-  var svg = d3.select(parentName).append('svg');
+  this.container = d3.select(parentName);
+  var svg = this.container.append('svg');
   var root = svg.append('g');
 
   // Define the #arrowhead shape for use with edge paths.
@@ -499,6 +500,7 @@ var KnowledgeMap = function(api, config) {
     var nodes = graph.nodes().map(function(id) {
       return graph.node(id);
     });
+    this.nodes = nodes;
 
     // Perform graph layout.
     var result = this.renderNodes.run(nodes);
@@ -521,10 +523,22 @@ var KnowledgeMap = function(api, config) {
         layout: layout.edge(id)
       };
     });
+    this.edges = edges;
     this.renderEdges.run(edges);
     this.positionEdges.run(edges);
 
     this.layout = layout;
+  };
+
+  /*
+  Update the graph rendering without changing its layout. Allows you to change
+  colours and other superficial things.
+  */
+  this.refresh = function() {
+    this.renderNodes.run(this.nodes);
+    this.positionNodes.run(this.nodes);
+    this.renderEdges.run(this.edges);
+    this.positionEdges.run(this.edges);
   };
 
   // Create the directed graph
