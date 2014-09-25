@@ -259,8 +259,18 @@ var KnowledgeMap = function(api, config) {
       };
     }
 
-    // Add the resource to the graph as a node.
-    this.graph.addNode(resource.id, resource);
+
+    if(this.graph.hasNode(resource.id)) {
+        var g = this.graph;
+        // Updating the resource. First clean up all edges in the graph.
+        this.graph.incidentEdges(resource.id).forEach(function(e) {
+            g.delEdge(e);
+        });
+        this.graph.node(resource.id, resource);
+    } else {
+        // Add the resource to the graph as a node.
+        this.graph.addNode(resource.id, resource);
+    }
 
     // Deal with all the dependencies. Add new concepts and assets where
     // necessary, and add edges in the appropriate direction.
@@ -528,6 +538,8 @@ var KnowledgeMap = function(api, config) {
 
     this.layout = layout;
     this.doPostRender();
+
+    return this;
   };
 
   /*
