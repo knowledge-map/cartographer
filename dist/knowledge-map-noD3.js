@@ -485,6 +485,7 @@ var KnowledgeMap = function(api, config) {
   */
   callback.call(this, 'preLayout');
   callback.call(this, 'postLayout');
+  callback.call(this, 'postRender');
   this.render = function() {
     if(this.held()) {
       return;
@@ -528,6 +529,7 @@ var KnowledgeMap = function(api, config) {
     this.positionEdges.run(edges);
 
     this.layout = layout;
+    this.doPostRender();
   };
 
   /*
